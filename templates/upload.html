@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Upload de Planilha</h1>
+
+<div class="card">
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <button onclick="enviarPlanilha()">Enviar</button>
+</div>
+
+<div id="resultado"></div>
+
+<script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+{% endblock %}

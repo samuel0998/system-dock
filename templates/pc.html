@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container">
+
+    <h2 class="titulo-pagina">Painel de Controle</h2>
+    <div class="filtro-container">
+
+    <div class="filtro-grupo">
+        <label>Data Inicial</label>
+        <input type="date" id="filtroDataInicio">
+    </div>
+
+    <div class="filtro-grupo">
+        <label>Data Final</label>
+        <input type="date" id="filtroDataFim">
+    </div>
+
+    <div class="filtro-grupo">
+        <label>Status</label>
+        <select id="filtroStatus" multiple size="4">
+            <option value="arrival">Arrival</option>
+            <option value="checkin">Checkin</option>
+            <option value="closed">Concluídas</option>
+            <option value="no_show">No Show</option>
+        </select>
+    </div>
+
+    <div class="filtro-grupo">
+        <label>Buscar Appointment ID</label>
+        <input type="text" id="filtroAppointment" placeholder="Digite o ID">
+    </div>
+
+    <div class="filtro-botoes">
+        <button onclick="aplicarFiltros()" class="btn-filtrar">Filtrar</button>
+        <button onclick="limparFiltros()" class="btn-limpar">Limpar</button>
+    </div>
+<button class="btn-danger" onclick="limparBanco()">
+    ⚠ Limpar Banco (TEMP)
+</button>
+
+</div>
+
+
+    <div class="tabela-container">
+
+        <table class="tabela-cargas">
+
+            <thead>
+                <tr>
+                    <th>Appointment ID</th>
+                    <th>Data</th>
+                    <th>Units</th>
+                    <th>Cartons</th>
+                    <th>Status</th>
+                    <th>AA</th>
+                    <th>Priority</th>
+                    <th>Tempo</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+
+            <tbody id="tabelaCargas">
+                <!-- JS vai renderizar aqui -->
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/painel.js') }}"></script>
+
+{% endblock %}
