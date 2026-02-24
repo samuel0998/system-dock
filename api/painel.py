@@ -178,65 +178,54 @@ from sqlalchemy import text
 @painel_bp.route("/aa-disponiveis")
 def aa_disponiveis():
     """
-    REGRAS (2 tabelas):
-    1) operadores.processo == 'DOCA IN'  -> entra
-    2) movimentos.processo_destino == 'DOCA IN' e movimentos.status == 'ativo' -> entra
-    (união das duas listas, sem duplicar)
+    AA aparece no Setar AA se:
+
+    1) cargo = 'AA'
+    2) não estiver falta / emprestado / treinamento
+    3) (operadores.processo = 'DOCA IN')
+       OU
+       (existe movimento ativo com destino DOCA IN)
     """
+
     try:
         query = text("""
-            WITH base_operadores AS (
-                SELECT
-                    o.login,
-                    o.nome,
-                    o.badge,
-                    o.emprestado,
-                    o.falta
-                FROM operadores o
-                WHERE o.cargo = 'AA'
-                  AND COALESCE(o.falta, false) = false
-                  AND COALESCE(o.emprestado, false) = false
-            ),
-            home_doca AS (
-                -- Porta 1: operador "de origem" DOCA IN (campo processo)
-                SELECT b.*
-                FROM base_operadores b
-                JOIN operadores o ON o.badge = b.badge
-                WHERE UPPER(COALESCE(o.processo,'')) = 'DOCA IN'
-            ),
-            move_ativo_doca AS (
-                -- Porta 2: quem está ATIVO com destino DOCA IN (pega só o badge)
-                SELECT DISTINCT m.badge
-                FROM movimentos m
-                WHERE UPPER(COALESCE(m.processo_destino,'')) = 'DOCA IN'
-                  AND LOWER(COALESCE(m.status,'')) = 'ativo'
-            ),
-            move_doca AS (
-                SELECT b.*
-                FROM base_operadores b
-                JOIN move_ativo_doca mad ON mad.badge = b.badge
-            )
             SELECT DISTINCT
-                login, nome, badge, emprestado
-            FROM (
-                SELECT * FROM home_doca
-                UNION ALL
-                SELECT * FROM move_doca
-            ) x
-            ORDER BY nome;
+                o.login,
+                o.nome,
+                o.tag AS badge,
+                o.setor,
+                o.turno
+            FROM operadores o
+            LEFT JOIN movimentos m
+                ON m.badge = o.tag
+            WHERE o.cargo = 'AA'
+              AND COALESCE(o.falta, false) = false
+              AND COALESCE(o.emprestado, false) = false
+              AND COALESCE(o.treinamento, false) = false
+              AND (
+                    UPPER(COALESCE(o.processo,'')) = 'DOCA IN'
+                 OR (
+                        UPPER(COALESCE(m.processo_destino,'')) = 'DOCA IN'
+                    AND LOWER(COALESCE(m.status,'')) = 'ativo'
+                    )
+                  )
+            ORDER BY o.nome;
         """)
 
-        rows = db.session.execute(query).mappings().all()
+        result = db.session.execute(query).mappings().all()
 
-        return jsonify([
+        lista = [
             {
                 "login": r["login"],
                 "nome": r["nome"],
                 "badge": r["badge"],
-                "emprestado": bool(r["emprestado"])
+                "setor": r["setor"],
+                "turno": r["turno"],
             }
-            for r in rows
-        ])
+            for r in result
+        ]
+
+        return jsonify(lista)
 
     except Exception:
         current_app.logger.exception("Erro em /pc/aa-disponiveis")
