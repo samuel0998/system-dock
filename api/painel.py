@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template
-from datetime import datetime, timezone , timedelta
-from google.cloud.firestore import FieldFilter
+from datetime import datetime, timezone, timedelta
+
 from db import db
 from models import Carga, Operador
 
@@ -21,9 +21,7 @@ def painel_page():
 def listar_cargas():
     agora = datetime.now(timezone.utc)
 
-    # busca tudo (se quiser paginar depois eu monto)
     cargas = Carga.query.order_by(Carga.expected_arrival_date.asc()).all()
-
     lista = []
 
     for c in cargas:
@@ -47,94 +45,89 @@ def listar_cargas():
         })
 
     db.session.commit()  # salva eventuais no_show
-
     return jsonify(lista)
 
 
-@painel_bp.route("/checkin/<carga_id>", methods=["POST"])
+@painel_bp.route("/checkin/<int:carga_id>", methods=["POST"])
 def checkin(carga_id):
-
     dados = request.get_json()
 
     if not dados or not dados.get("aa_responsavel"):
         return jsonify({"error": "AA não informado"}), 400
 
-    db.collection("cargas").document(carga_id).update({
-        "status": "checkin",
-        "aa_responsavel": dados.get("aa_responsavel"),
-        "start_time": datetime.now(timezone.utc)
-    })
+    carga = Carga.query.get(carga_id)
+    if not carga:
+        return jsonify({"error": "Carga não encontrada"}), 404
 
+    carga.status = "checkin"
+    carga.aa_responsavel = dados.get("aa_responsavel")
+    carga.start_time = datetime.now(timezone.utc)
+
+    db.session.commit()
     return jsonify({"message": "Checkin realizado"})
 
 
-@painel_bp.route("/finalizar/<carga_id>", methods=["POST"])
+@painel_bp.route("/finalizar/<int:carga_id>", methods=["POST"])
 def finalizar(carga_id):
+    carga = Carga.query.get(carga_id)
+    if not carga:
+        return jsonify({"error": "Carga não encontrada"}), 404
 
-    carga_ref = db.collection("cargas").document(carga_id)
-    carga = carga_ref.get().to_dict()
-
-    start_time = carga.get("start_time")
-
+    start_time = carga.start_time
     if not isinstance(start_time, datetime):
         return jsonify({"error": "Carga não iniciada"}), 400
 
     end_time = datetime.now(timezone.utc)
 
     tempo_total_segundos = int((end_time - start_time).total_seconds())
-    units = carga.get("units", 0)
+    units = carga.units or 0
 
     tempo_total_horas = tempo_total_segundos / 3600
     units_por_hora = round(units / tempo_total_horas, 2) if tempo_total_horas > 0 else 0
 
-    carga_ref.update({
-        "status": "closed",
-        "end_time": end_time,
-        "tempo_total_segundos": tempo_total_segundos,
-        "units_por_hora": units_por_hora
-    })
+    carga.status = "closed"
+    carga.end_time = end_time
+    carga.tempo_total_segundos = tempo_total_segundos
+    carga.units_por_hora = units_por_hora
 
+    db.session.commit()
     return jsonify({"message": "Carga finalizada"})
+
+
 @painel_bp.route("/limpar-banco", methods=["DELETE"])
 def limpar_banco():
-
-    cargas_ref = db.collection("cargas").stream()
-
-    deletadas = 0
-
-    for doc in cargas_ref:
-        db.collection("cargas").document(doc.id).delete()
-        deletadas += 1
+    # apaga tudo da tabela cargas
+    deletadas = db.session.query(Carga).delete(synchronize_session=False)
+    db.session.commit()
 
     return jsonify({
         "message": "Banco limpo com sucesso",
-        "deletadas": deletadas
+        "deletadas": int(deletadas or 0)
     })
-@painel_bp.route("/deletar/<carga_id>", methods=["POST"])
-def deletar_carga(carga_id):
 
-    data = request.json
+
+@painel_bp.route("/deletar/<int:carga_id>", methods=["POST"])
+def deletar_carga(carga_id):
+    data = request.get_json() or {}
     motivo = data.get("motivo")
 
     if not motivo:
         return jsonify({"error": "Motivo é obrigatório"}), 400
 
-    db.collection("cargas").document(carga_id).update({
-        "status": "deleted",
-        "delete_reason": motivo,
-        "deleted_at": datetime.now(timezone.utc)
-    })
+    carga = Carga.query.get(carga_id)
+    if not carga:
+        return jsonify({"error": "Carga não encontrada"}), 404
 
+    carga.status = "deleted"
+    carga.delete_reason = motivo
+    carga.deleted_at = datetime.now(timezone.utc)
+
+    db.session.commit()
     return jsonify({"message": "Carga marcada como deletada"})
 
 
 @painel_bp.route("/aa-disponiveis")
 def aa_disponiveis():
-
-    # processo_atual == "DOCA IN"
-    # falta == False (ou None)
-    # emprestado opcional
-
     operadores = (
         Operador.query
         .filter(Operador.processo_atual == "DOCA IN")
