@@ -5,44 +5,57 @@
 <div class="container">
 
     <h2 class="titulo-pagina">Painel de Controle</h2>
+
+    <!-- ========================= -->
+    <!-- 🔎 FILTROS -->
+    <!-- ========================= -->
     <div class="filtro-container">
 
-    <div class="filtro-grupo">
-        <label>Data Inicial</label>
-        <input type="date" id="filtroDataInicio">
+        <div class="filtro-grupo">
+            <label>Data Inicial</label>
+            <input type="date" id="filtroDataInicio">
+        </div>
+
+        <div class="filtro-grupo">
+            <label>Data Final</label>
+            <input type="date" id="filtroDataFim">
+        </div>
+
+        <div class="filtro-grupo">
+            <label>Status</label>
+            <select id="filtroStatus" multiple size="4">
+                <option value="arrival">Arrival</option>
+                <option value="checkin">Checkin</option>
+                <option value="closed">Concluídas</option>
+                <option value="no_show">No Show</option>
+            </select>
+        </div>
+
+        <div class="filtro-grupo">
+            <label>Buscar Appointment ID</label>
+            <input type="text" id="filtroAppointment" placeholder="Digite o ID">
+        </div>
+
+        <div class="filtro-botoes">
+            <button onclick="aplicarFiltros()" class="btn-filtrar">Filtrar</button>
+            <button onclick="limparFiltros()" class="btn-limpar">Limpar</button>
+        </div>
+
+        <button class="btn-danger" onclick="limparBanco()">
+            ⚠ Limpar Banco (TEMP)
+        </button>
+
+
     </div>
 
-    <div class="filtro-grupo">
-        <label>Data Final</label>
-        <input type="date" id="filtroDataFim">
-    </div>
 
-    <div class="filtro-grupo">
-        <label>Status</label>
-        <select id="filtroStatus" multiple size="4">
-            <option value="arrival">Arrival</option>
-            <option value="checkin">Checkin</option>
-            <option value="closed">Concluídas</option>
-            <option value="no_show">No Show</option>
-        </select>
-    </div>
-
-    <div class="filtro-grupo">
-        <label>Buscar Appointment ID</label>
-        <input type="text" id="filtroAppointment" placeholder="Digite o ID">
-    </div>
-
-    <div class="filtro-botoes">
-        <button onclick="aplicarFiltros()" class="btn-filtrar">Filtrar</button>
-        <button onclick="limparFiltros()" class="btn-limpar">Limpar</button>
-    </div>
-<button class="btn-danger" onclick="limparBanco()">
-    ⚠ Limpar Banco (TEMP)
-</button>
 
 </div>
 
 
+    <!-- ========================= -->
+    <!-- 📋 TABELA -->
+    <!-- ========================= -->
     <div class="tabela-container">
 
         <table class="tabela-cargas">
@@ -62,7 +75,7 @@
             </thead>
 
             <tbody id="tabelaCargas">
-                <!-- JS vai renderizar aqui -->
+                <!-- JS renderiza aqui -->
             </tbody>
 
         </table>
@@ -71,6 +84,55 @@
 
 </div>
 
+
+<!-- ========================= -->
+<!-- 🔥 MODAL DELETE -->
+<!-- ========================= -->
+<div id="modalDelete" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h3>Motivo da Exclusão</h3>
+
+        <textarea id="motivoDelete"
+                  placeholder="Descreva o motivo..."
+                  rows="4"></textarea>
+
+        <div class="modal-actions">
+            <button onclick="confirmarDelete()" class="btn-confirm">
+                Confirmar
+            </button>
+
+            <button onclick="fecharModalDelete()" class="btn-cancel">
+                Cancelar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= -->
+<!-- 👤 MODAL SELECIONAR AA -->
+<!-- ========================= -->
+<div id="modalAA" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h3>Selecionar AA Disponível</h3>
+
+        <input type="text" id="inputLoginAA"  readonly>
+
+        <div id="listaAA" class="lista-aa"></div>
+
+        <div class="modal-actions">
+            <button onclick="confirmarAA()" class="btn-confirm">
+                Confirmar
+            </button>
+
+            <button onclick="fecharModalAA()" class="btn-cancel">
+                Cancelar
+            </button>
+        </div>
+    </div>
+</div>
+
+
 <script src="{{ url_for('static', filename='js/painel.js') }}"></script>
 
 {% endblock %}
+

@@ -1,6 +1,9 @@
 from flask import Blueprint, render_template, jsonify, request
-from firebase_config import db
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from sqlalchemy import func
+
+from db import db
+from models import Carga
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -9,78 +12,224 @@ dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 def dashboard_page():
     return render_template("dashboard.html")
 
+
 @dashboard_bp.route("/stats")
 def dashboard_stats():
-
     data_inicio = request.args.get("dataInicio")
     data_fim = request.args.get("dataFim")
 
     if not data_inicio or not data_fim:
-        return jsonify({})
+        return jsonify({
+            "total_units": 0,
+            "total_units_no_show": 0,
+            "total_notas_fechadas": 0,
+            "total_notas_pendentes": 0,
+            "total_notas_andamento": 0,
+            "total_notas_deletadas": 0,
+            "total_notas_no_show": 0,
+            "unidades_por_dia": {},
+            "notas_por_dia": {},
+            "notas_deletadas_por_dia": {},
+            "no_show_por_dia": {},
+            "por_login": {}
+        })
 
+    # intervalo UTC (00:00:00 até 23:59:59)
     inicio = datetime.fromisoformat(data_inicio).replace(
         hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
     )
-
     fim = datetime.fromisoformat(data_fim).replace(
         hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc
     )
 
-    cargas_ref = db.collection("cargas").stream()
+    # ==========================
+    # CLOSED (fechadas) por end_time
+    # ==========================
+    total_notas_fechadas = (
+        db.session.query(func.count(Carga.id))
+        .filter(
+            Carga.status == "closed",
+            Carga.end_time.isnot(None),
+            Carga.end_time >= inicio,
+            Carga.end_time <= fim
+        )
+        .scalar()
+    ) or 0
 
-    total_units = 0
-    total_notas_fechadas = 0
-    total_notas_pendentes = 0
+    total_units = (
+        db.session.query(func.coalesce(func.sum(Carga.units), 0))
+        .filter(
+            Carga.status == "closed",
+            Carga.end_time.isnot(None),
+            Carga.end_time >= inicio,
+            Carga.end_time <= fim
+        )
+        .scalar()
+    ) or 0
 
-    unidades_por_dia = {}
-    notas_por_dia = {}
-    por_login = {}
+    unidades_por_dia_rows = (
+        db.session.query(
+            func.date(Carga.end_time).label("dia"),
+            func.coalesce(func.sum(Carga.units), 0).label("units")
+        )
+        .filter(
+            Carga.status == "closed",
+            Carga.end_time.isnot(None),
+            Carga.end_time >= inicio,
+            Carga.end_time <= fim
+        )
+        .group_by(func.date(Carga.end_time))
+        .order_by(func.date(Carga.end_time))
+        .all()
+    )
+    unidades_por_dia = {str(r.dia): int(r.units) for r in unidades_por_dia_rows}
 
-    for doc in cargas_ref:
-        carga = doc.to_dict()
+    notas_por_dia_rows = (
+        db.session.query(
+            func.date(Carga.end_time).label("dia"),
+            func.count(Carga.id).label("qtd")
+        )
+        .filter(
+            Carga.status == "closed",
+            Carga.end_time.isnot(None),
+            Carga.end_time >= inicio,
+            Carga.end_time <= fim
+        )
+        .group_by(func.date(Carga.end_time))
+        .order_by(func.date(Carga.end_time))
+        .all()
+    )
+    notas_por_dia = {str(r.dia): int(r.qtd) for r in notas_por_dia_rows}
 
-        status = carga.get("status")
-        end_time = carga.get("end_time")
-        created_at = carga.get("created_at")
-        units = carga.get("units", 0)
-        login = carga.get("aa_responsavel")
+    por_login_rows = (
+        db.session.query(
+            Carga.aa_responsavel,
+            func.coalesce(func.sum(Carga.units), 0).label("units"),
+            func.count(Carga.id).label("notas")
+        )
+        .filter(
+            Carga.status == "closed",
+            Carga.end_time.isnot(None),
+            Carga.end_time >= inicio,
+            Carga.end_time <= fim,
+            Carga.aa_responsavel.isnot(None)
+        )
+        .group_by(Carga.aa_responsavel)
+        .order_by(func.sum(Carga.units).desc())
+        .all()
+    )
+    por_login = {
+        r.aa_responsavel: {"units": int(r.units), "notas": int(r.notas)}
+        for r in por_login_rows
+    }
 
-        # 🔹 FECHADAS
-        if status == "closed" and isinstance(end_time, datetime):
+    # ==========================
+    # CHECKIN (andamento) por created_at
+    # ==========================
+    total_notas_andamento = (
+        db.session.query(func.count(Carga.id))
+        .filter(
+            Carga.status == "checkin",
+            Carga.created_at >= inicio,
+            Carga.created_at <= fim
+        )
+        .scalar()
+    ) or 0
 
-            if inicio <= end_time <= fim:
+    # ==========================
+    # ARRIVAL (pendentes) por created_at
+    # ==========================
+    total_notas_pendentes = (
+        db.session.query(func.count(Carga.id))
+        .filter(
+            Carga.status == "arrival",
+            Carga.created_at >= inicio,
+            Carga.created_at <= fim
+        )
+        .scalar()
+    ) or 0
 
-                total_notas_fechadas += 1
-                total_units += units
+    # ==========================
+    # DELETED por deleted_at
+    # ==========================
+    total_notas_deletadas = (
+        db.session.query(func.count(Carga.id))
+        .filter(
+            Carga.status == "deleted",
+            Carga.deleted_at.isnot(None),
+            Carga.deleted_at >= inicio,
+            Carga.deleted_at <= fim
+        )
+        .scalar()
+    ) or 0
 
-                dia = end_time.date().isoformat()
+    deletadas_por_dia_rows = (
+        db.session.query(
+            func.date(Carga.deleted_at).label("dia"),
+            func.count(Carga.id).label("qtd")
+        )
+        .filter(
+            Carga.status == "deleted",
+            Carga.deleted_at.isnot(None),
+            Carga.deleted_at >= inicio,
+            Carga.deleted_at <= fim
+        )
+        .group_by(func.date(Carga.deleted_at))
+        .order_by(func.date(Carga.deleted_at))
+        .all()
+    )
+    notas_deletadas_por_dia = {str(r.dia): int(r.qtd) for r in deletadas_por_dia_rows}
 
-                # Units por dia
-                unidades_por_dia[dia] = unidades_por_dia.get(dia, 0) + units
+    # ==========================
+    # NO SHOW por created_at (mantendo sua lógica atual)
+    # ==========================
+    total_notas_no_show = (
+        db.session.query(func.count(Carga.id))
+        .filter(
+            Carga.status == "no_show",
+            Carga.created_at >= inicio,
+            Carga.created_at <= fim
+        )
+        .scalar()
+    ) or 0
 
-                # Notas por dia
-                notas_por_dia[dia] = notas_por_dia.get(dia, 0) + 1
+    no_show_por_dia_rows = (
+        db.session.query(
+            func.date(Carga.created_at).label("dia"),
+            func.count(Carga.id).label("qtd")
+        )
+        .filter(
+            Carga.status == "no_show",
+            Carga.created_at >= inicio,
+            Carga.created_at <= fim
+        )
+        .group_by(func.date(Carga.created_at))
+        .order_by(func.date(Carga.created_at))
+        .all()
+    )
+    no_show_por_dia = {str(r.dia): int(r.qtd) for r in no_show_por_dia_rows}
 
-                # Por login
-                if login:
-                    if login not in por_login:
-                        por_login[login] = {"units": 0, "notas": 0}
-
-                    por_login[login]["units"] += units
-                    por_login[login]["notas"] += 1
-
-        # 🔹 PENDENTES
-        elif status != "closed" and isinstance(created_at, datetime):
-
-            if inicio <= created_at <= fim:
-                total_notas_pendentes += 1
+    total_units_no_show = (
+        db.session.query(func.coalesce(func.sum(Carga.units), 0))
+        .filter(
+            Carga.status == "no_show",
+            Carga.created_at >= inicio,
+            Carga.created_at <= fim
+        )
+        .scalar()
+    ) or 0
 
     return jsonify({
-        "total_units": total_units,
-        "total_notas_fechadas": total_notas_fechadas,
-        "total_notas_pendentes": total_notas_pendentes,
+        "total_units": int(total_units),
+        "total_units_no_show": int(total_units_no_show),
+        "total_notas_fechadas": int(total_notas_fechadas),
+        "total_notas_pendentes": int(total_notas_pendentes),
+        "total_notas_andamento": int(total_notas_andamento),
+        "total_notas_deletadas": int(total_notas_deletadas),
+        "total_notas_no_show": int(total_notas_no_show),
         "unidades_por_dia": unidades_por_dia,
         "notas_por_dia": notas_por_dia,
+        "notas_deletadas_por_dia": notas_deletadas_por_dia,
+        "no_show_por_dia": no_show_por_dia,
         "por_login": por_login
     })
-

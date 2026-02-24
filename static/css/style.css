@@ -1,22 +1,10 @@
 body {
-    font-family: Arial;
-    background-color: #f4f6f9;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-color: #f7f7f5;
+    color: #2f3437;
     margin: 0;
 }
 
-.navbar {
-    background-color: #1e293b;
-    color: white;
-    padding: 15px;
-    display: flex;
-    justify-content: space-between;
-}
-
-.navbar a {
-    color: white;
-    margin-left: 20px;
-    text-decoration: none;
-}
 
 .container {
     padding: 40px;
@@ -91,11 +79,44 @@ th {
     align-items: center;
     gap: 10px;
 }
+
+
+.grafico-card {
+    height: 450px;
+    grid-column: 1 / -1;
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+.grafico-card h4 {
+    margin-bottom: 15px;
+    font-weight: 600;
+    color: #333;
+}
+
+.grafico-card {
+    min-height: 420px;
+}
+
+.grafico-card canvas {
+    height: 360px !important;
+}
+
+
+
 .graficos-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 30px;
+    gap: 35px;
     margin-top: 40px;
+}
+
+@media (max-width: 1100px) {
+    .graficos-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .grafico-card {
@@ -111,32 +132,7 @@ th {
     color: #333;
 }
 
-.grafico-card canvas {
-    height: 280px !important;
-}
-.graficos-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 30px;
-    margin-top: 40px;
-}
 
-.grafico-card {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-}
-
-.grafico-card h4 {
-    margin-bottom: 15px;
-    font-weight: 600;
-    color: #333;
-}
-
-.grafico-card canvas {
-    height: 280px !important;
-}
 
 .prio-alta {
     background-color: #ff4d4d;
@@ -273,4 +269,329 @@ th {
 
 .btn-danger:hover {
     background: #991b1b;
+}
+/* ================= MODAL ================= */
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.modal-content {
+    background: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    width: 400px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.modal-content h3 {
+    margin-bottom: 15px;
+}
+
+.modal-content textarea {
+    width: 100%;
+    padding: 10px;
+    resize: none;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+.modal-actions {
+    margin-top: 15px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.btn-confirm {
+    background: #e53935;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.btn-cancel {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.btn-delete {
+    background: #c62828;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    margin-left: 5px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.status-deleted {
+    color: #c62828;
+    font-weight: bold;
+}
+
+/* =========================================
+   CARDS DASHBOARD PADRÃO PROFISSIONAL
+========================================= */
+
+.cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.card-dashboard {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 24px;
+    border: 1px solid #e9e9e7;
+    box-shadow: none;
+    transition: background 0.2s ease;
+}
+
+.card-dashboard:hover {
+    background: #fafafa;
+}
+
+.card-dashboard h4 {
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b6f76;
+    margin-bottom: 8px;
+}
+
+.card-dashboard span {
+    font-size: 28px;
+    font-weight: 600;
+    color: #111;
+}
+
+
+.status-no-show {
+    background: #111;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+
+/* =========================
+   🌙 DARK MODE
+========================= */
+
+body.dark-mode {
+    background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+    color: #e5e7eb;
+}
+
+body.dark-mode .card-dashboard,
+body.dark-mode .grafico-card,
+body.dark-mode .filtro-container,
+body.dark-mode table {
+    background: #1e293b;
+    color: #e5e7eb;
+}
+
+body.dark-mode th {
+    background-color: #111827;
+}
+
+body.dark-mode .card-dashboard span {
+    color: #ffffff;
+}
+.lista-aa {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+.item-aa {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+    cursor: pointer;
+}
+
+.item-aa:hover {
+    background-color: #f0f0f0;
+}
+
+
+.rate-container {
+    display: flex;
+    gap: 20px;
+}
+
+.rate-sidebar {
+    width: 220px;
+    background: #111827;
+    padding: 20px;
+    border-radius: 12px;
+    color: white;
+    text-align: center;
+}
+
+.foto-perfil {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+}
+
+.rate-main {
+    flex: 1;
+}
+
+.rate-filtros {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.graficos {
+    display: flex;
+    gap: 20px;
+}
+
+.graficos canvas {
+    height: 250px !important;
+}
+
+.historico table {
+    width: 100%;
+    margin-top: 20px;
+    font-size: 14px;
+}
+.top-bar {
+    background-color: #1f2a3a; /* Azul do sistema */
+    padding: 15px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo-img {
+    height: 110px;
+    width: auto;
+}
+
+.logo-container h2 {
+    color: white;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin: 0;
+}
+
+
+
+.main-header {
+    height: 80px;
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 40px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.logo-lion {
+    height: 70px;
+    width: auto;
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+}
+
+.brand-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 1px;
+}
+
+.brand-sub {
+    font-size: 14px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.header-nav {
+    display: flex;
+    gap: 30px;
+}
+
+.header-nav a {
+    text-decoration: none;
+    color: #cbd5e1;
+    font-weight: 500;
+    font-size: 14px;
+    transition: 0.3s ease;
+}
+
+.header-nav a:hover {
+    color: #38bdf8;
+}
+
+
+.menu {
+    display: flex;
+    gap: 28px;
+    align-items: center;
+}
+
+.menu a {
+    position: relative;
+    text-decoration: none;
+    color: #cbd5e1;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 6px 0;
+    transition: all 0.3s ease;
+}
+
+.menu a::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    width: 0%;
+    height: 2px;
+    background: #38bdf8;
+    transition: width 0.3s ease;
+}
+
+.menu a:hover {
+    color: #ffffff;
+}
+
+.menu a:hover::after {
+    width: 100%;
 }

@@ -1,64 +1,110 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Dashboard DOCA</h1>
 
-<div class="filtro-container">
+<div class="container">
 
-    <h3>Buscar por Intervalo de Datas</h3>
-
-    <input type="date" id="dataInicio">
-    <span>até</span>
-    <input type="date" id="dataFim">
-
-    <button onclick="aplicarFiltro()">Buscar</button>
-
-</div>
-
-
-</div>
-
-<div class="cards">
-
-    <div class="card-metric">
-        <h3>Total Units Fechadas</h3>
-        <p id="totalUnits">0</p>
+    <!-- ========================= -->
+    <!-- 🔹 TÍTULO -->
+    <!-- ========================= -->
+    <div style="display:flex; align-items:center; gap:15px;">
+        <h2 class="titulo-pagina">Dashboard DOCA</h2>
+        <button onclick="toggleDarkMode()">🌙</button>
     </div>
 
-    <div class="card-metric">
-        <h3>Notas Fechadas</h3>
-        <p id="totalNotasFechadas">0</p>
+    <!-- ========================= -->
+    <!-- 🔹 FILTRO -->
+    <!-- ========================= -->
+    <div class="filtro-container">
+        <div class="filtro-grupo">
+            <label>Buscar por Intervalo de Datas</label>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <input type="date" id="dataInicio">
+                <span>até</span>
+                <input type="date" id="dataFim">
+                <button onclick="aplicarFiltro()">Buscar</button>
+            </div>
+        </div>
     </div>
 
-    <div class="card-metric">
-        <h3>Notas Pendentes</h3>
-        <p id="totalNotasPendentes">0</p>
+    <!-- ========================= -->
+    <!-- 🔹 CARDS -->
+    <!-- ========================= -->
+    <div class="cards-container">
+
+        <div class="card-dashboard card-units">
+            <h4>Total Units Fechadas</h4>
+            <span id="totalUnits">0</span>
+        </div>
+
+        <div class="card-dashboard card-fechadas">
+            <h4>Notas Fechadas</h4>
+            <span id="totalNotasFechadas">0</span>
+        </div>
+
+        <div class="card-dashboard card-pendentes">
+            <h4>Notas Pendentes</h4>
+            <span id="totalNotasPendentes">0</span>
+        </div>
+
+        <div class="card-dashboard card-andamento">
+            <h4>Notas em Andamento</h4>
+            <span id="totalNotasAndamento">0</span>
+        </div>
+
+        <div class="card-dashboard card-deletadas">
+            <h4>Notas Deletadas</h4>
+            <span id="totalNotasDeletadas">0</span>
+        </div>
+
+        <div class="card-dashboard card-noshow">
+            <h4>Notas No Show</h4>
+            <span id="totalNotasNoShow">0</span>
+        </div>
+
     </div>
 
+    <!-- ========================= -->
+    <!-- 🔥 GRÁFICOS PRINCIPAIS -->
+    <!-- ========================= -->
+    <div class="graficos-grid">
+
+        <div class="grafico-card">
+            <h4>Unidades Recebidas por Dia</h4>
+            <canvas id="graficoUnidadesDia"></canvas>
+        </div>
+
+        <div class="grafico-card">
+            <h4>Notas Recebidas por Dia</h4>
+            <canvas id="graficoNotasDia"></canvas>
+        </div>
+
+        <div class="grafico-card">
+            <h4>Notas Deletadas por Dia</h4>
+            <canvas id="graficoNotasDeletadasDia"></canvas>
+        </div>
+        
+         <div class="grafico-card">
+        <h4>No Show por Dia</h4>
+        <canvas id="graficoNoShowDia"></canvas>
+        </div>
+
+
+        <div class="grafico-card" style="margin-top:40px;">
+        <h4>Cargas Fechadas por AA</h4>
+        <canvas id="graficoCargasPorLogin"></canvas>
+        </div>
+
+
+        <div class="grafico-card" style="margin-top:40px;">
+        <h4>Performance por Login</h4>
+        <canvas id="graficoPorLogin"></canvas>
+        </div>
+
+    </div>
 </div>
-<div class="graficos-grid">
-
-    <div class="grafico-card">
-        <h4>Unidades Recebidas por Dia</h4>
-        <canvas id="graficoUnidadesDia"></canvas>
-    </div>
-
-    <div class="grafico-card">
-        <h4>Notas Recebidas por Dia</h4>
-        <canvas id="graficoNotasDia"></canvas>
-    </div>
-
-</div>
-
-<div class="grafico-card" style="margin-top:40px;">
-    <h4>Performance por Login</h4>
-    <canvas id="graficoPorLogin"></canvas>
-</div>
-
-
-<canvas id="graficoAA"></canvas>
-<canvas id="graficoHistorico"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+
 {% endblock %}
