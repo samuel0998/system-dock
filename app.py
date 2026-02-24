@@ -6,22 +6,44 @@ from api.upload import upload_bp
 from api.painel import painel_bp
 from api.dashboard import dashboard_bp
 
-from db import init_db
-import models  # garante que os models carreguem pro migrate
+from db import init_db, db
+import models  # garante que os models sejam importados (Carga etc.)
 
 
-def create_app():
+def _maybe_reset_cargas(app: Flask) -> None:
+    """
+    Reset controlado da tabela 'cargas' no deploy.
+    Use no Railway com variável de ambiente:
+      RESET_CARGAS=1
+    Depois de rodar 1x, REMOVA/volte pra 0.
+    """
+    if os.getenv("RESET_CARGAS", "0") != "1":
+        return
+
+    with app.app_context():
+        # Garantia extra (models já importado acima)
+        from models import Carga  # noqa: F401
+
+        # Drop somente da tabela 'cargas' e recria pelo model atual
+        db.drop_all(bind=None, tables=[models.Carga.__table__])
+        db.create_all()
+
+
+def create_app() -> Flask:
     app = Flask(__name__)
 
     # Configs básicas
     app.config["JSON_SORT_KEYS"] = False
     app.config["JSONIFY_PRETTYPRINT_REGULAR"] = True
 
-    # CORS (se quiser restringir depois, dá pra colocar origins)
+    # CORS
     CORS(app)
 
-    # Inicializa DB + Migrate
+    # Inicializa DB
     init_db(app)
+
+    # ✅ Reset controlado (apenas se RESET_CARGAS=1)
+    _maybe_reset_cargas(app)
 
     # Blueprints
     app.register_blueprint(upload_bp)
@@ -57,7 +79,7 @@ def create_app():
 app = create_app()
 
 
-# ✅ Apenas para rodar localmente (Railway usa Gunicorn do Dockerfile)
+# ✅ Rodar localmente
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
