@@ -175,58 +175,62 @@ def deletar_carga(carga_id):
 from flask import jsonify, current_app
 from sqlalchemy import text
 
-@painel_bp.route("/aa-disponiveis")
+@painel_bp.route("/aa-disponiveis", methods=["GET"])
 def aa_disponiveis():
     """
-    AA aparece no Setar AA se:
+    Retorna AAs disponíveis para 'Setar AA' seguindo a regra:
 
-    1) cargo = 'AA'
-    2) não estiver falta / emprestado / treinamento
-    3) (operadores.processo = 'DOCA IN')
-       OU
-       (existe movimento ativo com destino DOCA IN)
+    - entra se operadores.processo_atual == 'DOCA IN'
+      OU
+    - entra se existir movimentos com:
+        processo_destino == 'DOCA IN'
+        status == 'ativo'
+      (para o mesmo badge do operador)
+
+    Também filtra:
+    - cargo == 'AA'
+    - falta == false
+    - emprestado == false
+    - treinamento == false (se existir)
     """
-
     try:
         query = text("""
             SELECT DISTINCT
                 o.login,
                 o.nome,
-                o.tag AS badge,
-                o.setor,
-                o.turno
+                o.badge
             FROM operadores o
-            LEFT JOIN movimentos m
-                ON m.badge = o.tag
-            WHERE o.cargo = 'AA'
-              AND COALESCE(o.falta, false) = false
-              AND COALESCE(o.emprestado, false) = false
-              AND COALESCE(o.treinamento, false) = false
-              AND (
-                    UPPER(COALESCE(o.processo,'')) = 'DOCA IN'
-                 OR (
-                        UPPER(COALESCE(m.processo_destino,'')) = 'DOCA IN'
-                    AND LOWER(COALESCE(m.status,'')) = 'ativo'
+            WHERE
+                UPPER(TRIM(o.cargo)) = 'AA'
+                AND COALESCE(o.falta, false) = false
+                AND COALESCE(o.emprestado, false) = false
+                AND COALESCE(o.treinamento, false) = false
+                AND (
+                    UPPER(TRIM(o.processo_atual)) = 'DOCA IN'
+                    OR EXISTS (
+                        SELECT 1
+                        FROM movimentos m
+                        WHERE
+                            TRIM(CAST(m.badge AS TEXT)) = TRIM(CAST(o.badge AS TEXT))
+                            AND UPPER(TRIM(m.processo_destino)) = 'DOCA IN'
+                            AND LOWER(TRIM(m.status)) = 'ativo'
                     )
-                  )
-            ORDER BY o.nome;
+                )
+            ORDER BY o.nome ASC;
         """)
 
-        result = db.session.execute(query).mappings().all()
+        rows = db.session.execute(query).mappings().all()
 
-        lista = [
+        return jsonify([
             {
                 "login": r["login"],
                 "nome": r["nome"],
                 "badge": r["badge"],
-                "setor": r["setor"],
-                "turno": r["turno"],
             }
-            for r in result
-        ]
-
-        return jsonify(lista)
+            for r in rows
+        ]), 200
 
     except Exception:
         current_app.logger.exception("Erro em /pc/aa-disponiveis")
+        # não quebra o front: devolve lista vazia
         return jsonify([]), 200
