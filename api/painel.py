@@ -1,6 +1,6 @@
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request, render_template, current_app
 from datetime import datetime, timezone, timedelta
-
+from sqlalchemy import text
 from db import db
 from models import Carga, Operador
 
@@ -128,22 +128,48 @@ def deletar_carga(carga_id):
 
 @painel_bp.route("/aa-disponiveis")
 def aa_disponiveis():
-    operadores = (
-        Operador.query
-        .filter(Operador.processo_atual == "DOCA IN")
-        .all()
-    )
+    """
+    Lista AAs cujo último movimento foi para DOCA IN
+    """
 
-    lista = []
-    for op in operadores:
-        if op.falta:
-            continue
+    try:
+        query = text("""
+            SELECT o.tag AS login,
+                   o.tag AS badge,
+                   o.cargo,
+                   o.setor,
+                   o.turno,
+                   o.processo_atual,
+                   m.nome,
+                   m.processo_destino,
+                   m.data
+            FROM operadores o
+            JOIN movimentos m ON m.badge = o.tag
+            WHERE o.cargo = 'AA'
+            AND m.id = (
+                SELECT id
+                FROM movimentos
+                WHERE badge = o.tag
+                ORDER BY data DESC
+                LIMIT 1
+            )
+            AND m.processo_destino = 'DOCA IN'
+        """)
 
-        lista.append({
-            "login": op.login,
-            "nome": op.nome,
-            "badge": op.badge,
-            "emprestado": bool(op.emprestado)
-        })
+        result = db.session.execute(query).mappings().all()
 
-    return jsonify(lista)
+        lista = []
+
+        for row in result:
+            lista.append({
+                "login": row["login"],
+                "badge": row["badge"],
+                "nome": row["nome"],
+                "processo_atual": row["processo_destino"]
+            })
+
+        return jsonify(lista), 200
+
+    except Exception as e:
+        current_app.logger.exception("Erro em /pc/aa-disponiveis")
+        return jsonify([]), 200
