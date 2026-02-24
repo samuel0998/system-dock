@@ -1,7 +1,12 @@
 import os
 from sqlalchemy import create_engine, text
 
-def get_db_url():
+
+def get_db_url() -> str:
+    """
+    Busca a URL do Postgres a partir das variáveis mais comuns no Railway/Flask.
+    Normaliza postgres:// -> postgresql://
+    """
     url = (
         os.getenv("DATABASE_URL")
         or os.getenv("SQLALCHEMY_DATABASE_URI")
@@ -9,34 +14,54 @@ def get_db_url():
         or os.getenv("POSTGRES_URL")
         or os.getenv("POSTGRESQL_URL")
     )
+
     if not url:
-        raise RuntimeError("Sem DATABASE_URL no ambiente.")
+        raise RuntimeError(
+            "Sem URL do banco no ambiente. Defina DATABASE_URL (Railway) ou SQLALCHEMY_DATABASE_URI."
+        )
+
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
+
     return url
 
+
 def run():
-    engine = create_engine(get_db_url(), future=True)
+    engine = create_engine(get_db_url(), future=True, pool_pre_ping=True)
+
+    ddl = """
+    DROP TABLE IF EXISTS cargas CASCADE;
+
+    CREATE TABLE cargas (
+      id SERIAL PRIMARY KEY,
+
+      appointment_id VARCHAR(80) UNIQUE,
+      expected_arrival_date TIMESTAMP NULL,
+      priority_last_update TIMESTAMP NULL,
+      priority_score INTEGER NULL,
+      prioridade_maxima BOOLEAN NOT NULL DEFAULT FALSE,
+      status VARCHAR(30) NOT NULL DEFAULT 'arrival',
+      cartons INTEGER NOT NULL DEFAULT 0,
+      units INTEGER NOT NULL DEFAULT 0,
+
+      aa_responsavel VARCHAR(80) NULL,
+      start_time TIMESTAMP NULL,
+      end_time TIMESTAMP NULL,
+      tempo_total_segundos INTEGER NULL,
+      units_por_hora INTEGER NULL,
+
+      delete_reason VARCHAR(255) NULL,
+      deleted_at TIMESTAMP NULL,
+
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    """
 
     with engine.begin() as conn:
-        # 1) apaga a tabela antiga
-        conn.execute(text("DROP TABLE IF EXISTS cargas CASCADE;"))
+        conn.execute(text(ddl))
 
-        # 2) recria com as colunas que seu upload/model usa
-        conn.execute(text("""
-        CREATE TABLE cargas (
-            id SERIAL PRIMARY KEY,
-            appointment_id VARCHAR(80) UNIQUE,
-            expected_arrival_date TIMESTAMP NULL,
-            priority_last_update TIMESTAMP NULL,
-            priority_score INTEGER NULL,
-            prioridade_maxima BOOLEAN NOT NULL DEFAULT FALSE,
-            status VARCHAR(30) NOT NULL DEFAULT 'arrival',
-            cartons INTEGER NOT NULL DEFAULT 0,
-            units INTEGER NOT NULL DEFAULT 0,
-            created_at TIMESTAMP NOT NULL DEFAULT NOW()
-        );
-        """))
+    print("✅ Tabela 'cargas' recriada com sucesso.")
+
 
 if __name__ == "__main__":
     run()
