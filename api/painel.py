@@ -172,106 +172,71 @@ def deletar_carga(carga_id):
 # =========================
 # AAs disponíveis (LÓGICA CORRETA)
 # =========================
+from flask import jsonify, current_app
+from sqlalchemy import text
+
 @painel_bp.route("/aa-disponiveis")
 def aa_disponiveis():
     """
-    REGRAS (como você definiu):
-
-    - APARECE se:
-      (A) operador.processo_atual == 'DOCA IN'  (quando LaborDash estiver alimentando isso)
-      OU
-      (B) último movimento: processo_destino='DOCA IN' e status='ativo'
-      OU
-      (C) pertence originalmente à DOCA (existe movimento com processo_origem='DOCA IN')
-          e NÃO está ativo em outro processo.
-
-    - NÃO APARECE se:
-      último movimento status='ativo' e processo_destino != 'DOCA IN'
-      (ou seja: está ativo em outro processo)
+    REGRAS (2 tabelas):
+    1) operadores.processo == 'DOCA IN'  -> entra
+    2) movimentos.processo_destino == 'DOCA IN' e movimentos.status == 'ativo' -> entra
+    (união das duas listas, sem duplicar)
     """
     try:
         query = text("""
-            WITH last_move AS (
-                SELECT DISTINCT ON (m.badge)
-                    m.badge,
-                    m.processo_origem,
-                    m.processo_destino,
-                    m.status,
-                    COALESCE(m.criado_em, m.data_inicio) AS ts
-                FROM movimentos m
-                ORDER BY m.badge, COALESCE(m.criado_em, m.data_inicio) DESC
+            WITH base_operadores AS (
+                SELECT
+                    o.login,
+                    o.nome,
+                    o.badge,
+                    o.emprestado,
+                    o.falta
+                FROM operadores o
+                WHERE o.cargo = 'AA'
+                  AND COALESCE(o.falta, false) = false
+                  AND COALESCE(o.emprestado, false) = false
             ),
             home_doca AS (
-                SELECT DISTINCT badge
-                FROM movimentos
-                WHERE processo_origem = 'DOCA IN'
+                -- Porta 1: operador "de origem" DOCA IN (campo processo)
+                SELECT b.*
+                FROM base_operadores b
+                JOIN operadores o ON o.badge = b.badge
+                WHERE UPPER(COALESCE(o.processo,'')) = 'DOCA IN'
+            ),
+            move_ativo_doca AS (
+                -- Porta 2: quem está ATIVO com destino DOCA IN (pega só o badge)
+                SELECT DISTINCT m.badge
+                FROM movimentos m
+                WHERE UPPER(COALESCE(m.processo_destino,'')) = 'DOCA IN'
+                  AND LOWER(COALESCE(m.status,'')) = 'ativo'
+            ),
+            move_doca AS (
+                SELECT b.*
+                FROM base_operadores b
+                JOIN move_ativo_doca mad ON mad.badge = b.badge
             )
-            SELECT
-                o.login,
-                o.nome,
-                o.badge,
-                o.emprestado,
-                o.falta,
-                o.processo_atual,
-                lm.processo_origem AS lm_origem,
-                lm.processo_destino AS lm_destino,
-                lm.status AS lm_status,
-                (hd.badge IS NOT NULL) AS pertence_doca
-            FROM operadores o
-            LEFT JOIN last_move lm ON lm.badge = o.badge
-            LEFT JOIN home_doca hd ON hd.badge = o.badge
-            WHERE o.cargo = 'AA'
+            SELECT DISTINCT
+                login, nome, badge, emprestado
+            FROM (
+                SELECT * FROM home_doca
+                UNION ALL
+                SELECT * FROM move_doca
+            ) x
+            ORDER BY nome;
         """)
 
         rows = db.session.execute(query).mappings().all()
 
-        disponiveis = []
-        for r in rows:
-            if r.get("falta"):
-                continue
-            if r.get("emprestado"):
-                continue
-
-            processo_atual = (r.get("processo_atual") or "").upper()
-            lm_destino = (r.get("lm_destino") or "").upper()
-            lm_status = (r.get("lm_status") or "").lower()
-            pertence_doca = bool(r.get("pertence_doca"))
-
-            # (A) está em DOCA IN pelo operador
-            if processo_atual == "DOCA IN":
-                disponiveis.append({
-                    "login": r["login"],
-                    "nome": r["nome"],
-                    "badge": r["badge"],
-                    "emprestado": bool(r["emprestado"])
-                })
-                continue
-
-            # Se está ATIVO em outro processo -> bloqueia
-            if lm_status == "ativo" and lm_destino and lm_destino != "DOCA IN":
-                continue
-
-            # (B) ATIVO com destino DOCA IN -> aparece
-            if lm_status == "ativo" and lm_destino == "DOCA IN":
-                disponiveis.append({
-                    "login": r["login"],
-                    "nome": r["nome"],
-                    "badge": r["badge"],
-                    "emprestado": bool(r["emprestado"])
-                })
-                continue
-
-            # (C) pertence originalmente à DOCA (origem DOCA IN em algum momento)
-            # e não está ativo fora -> aparece mesmo se o último movimento estiver inativo
-            if pertence_doca:
-                disponiveis.append({
-                    "login": r["login"],
-                    "nome": r["nome"],
-                    "badge": r["badge"],
-                    "emprestado": bool(r["emprestado"])
-                })
-
-        return jsonify(disponiveis)
+        return jsonify([
+            {
+                "login": r["login"],
+                "nome": r["nome"],
+                "badge": r["badge"],
+                "emprestado": bool(r["emprestado"])
+            }
+            for r in rows
+        ])
 
     except Exception:
         current_app.logger.exception("Erro em /pc/aa-disponiveis")
