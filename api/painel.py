@@ -1,16 +1,29 @@
 from flask import Blueprint, jsonify, request, render_template, current_app
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
+
+from sqlalchemy import text
 
 from db import db
-from models import Carga  # Operador pode ou não existir no models, por isso não dependo dele aqui
-from sqlalchemy import text
+from models import Carga, Operador  # Operador deve mapear a tabela "operadores"
 
 painel_bp = Blueprint("painel", __name__, url_prefix="/pc")
 
 
-# =====================================================
-# PÁGINAS
-# =====================================================
+# =========================
+# Helpers
+# =========================
+def to_aware_utc(dt: datetime | None) -> datetime | None:
+    """Garante datetime timezone-aware em UTC para evitar erro naive vs aware."""
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+# =========================
+# Pages
+# =========================
 @painel_bp.route("/rate")
 def rate_page():
     return render_template("rate.html")
@@ -21,97 +34,54 @@ def painel_page():
     return render_template("pc.html")
 
 
-# =====================================================
-# HELPERS (timezone safe)
-# =====================================================
-def now_utc_naive():
-    # Mantém tudo NAIVE para não estourar comparação com campos sem timezone no banco
-    return datetime.utcnow()
-
-
-def dt_to_iso(dt):
-    if not dt:
-        return None
-    # Se vier aware, converte pra naive UTC
-    try:
-        if getattr(dt, "tzinfo", None) is not None:
-            return dt.astimezone(tz=None).replace(tzinfo=None).isoformat()
-    except Exception:
-        pass
-    return dt.isoformat()
-
-
-def to_naive(dt):
-    if not dt:
-        return None
-    try:
-        if getattr(dt, "tzinfo", None) is not None:
-            return dt.replace(tzinfo=None)
-    except Exception:
-        pass
-    return dt
-
-
-# =====================================================
-# LISTAR CARGAS (front depende disso)
-# =====================================================
+# =========================
+# Cargas
+# =========================
 @painel_bp.route("/listar")
 def listar_cargas():
     try:
-        agora = now_utc_naive()
+        agora = datetime.now(timezone.utc)
 
         cargas = Carga.query.order_by(Carga.expected_arrival_date.asc()).all()
         lista = []
-        mudou_status = False
 
         for c in cargas:
-            expected = to_naive(c.expected_arrival_date)
+            expected = to_aware_utc(c.expected_arrival_date)
 
-            # No-show automático: arrival + 24h após expected_arrival_date
-            if c.status == "arrival" and isinstance(expected, datetime):
+            # regra no-show automático (24h depois do Expected Arrival)
+            if c.status == "arrival" and expected:
                 limite_no_show = expected + timedelta(hours=24)
                 if agora > limite_no_show:
                     c.status = "no_show"
-                    mudou_status = True
 
             lista.append({
                 "id": c.id,
                 "appointment_id": c.appointment_id,
-                "expected_arrival_date": dt_to_iso(expected),
-                "units": int(c.units or 0),
-                "cartons": int(c.cartons or 0),
+                "expected_arrival_date": expected.isoformat() if expected else None,
+                "units": c.units or 0,
+                "cartons": c.cartons or 0,
                 "status": c.status,
                 "aa_responsavel": c.aa_responsavel,
-                "priority_score": float(c.priority_score or 0),
-                "start_time": dt_to_iso(to_naive(c.start_time)),
-                "end_time": dt_to_iso(to_naive(getattr(c, "end_time", None))),
-                "tempo_total_segundos": int(c.tempo_total_segundos or 0),
-                "units_por_hora": float(getattr(c, "units_por_hora", 0) or 0),
-                "delete_reason": getattr(c, "delete_reason", None),
-                "deleted_at": dt_to_iso(to_naive(getattr(c, "deleted_at", None))),
+                "priority_score": c.priority_score or 0,
+                "start_time": to_aware_utc(c.start_time).isoformat() if c.start_time else None,
+                "tempo_total_segundos": c.tempo_total_segundos
             })
 
-        if mudou_status:
-            db.session.commit()
-
-        return jsonify(lista), 200
+        db.session.commit()
+        return jsonify(lista)
 
     except Exception:
         current_app.logger.exception("Erro em /pc/listar")
-        # Nunca deixa o front “sem nada” por exceção
         return jsonify([]), 200
 
 
-# =====================================================
-# CHECKIN
-# =====================================================
 @painel_bp.route("/checkin/<int:carga_id>", methods=["POST"])
 def checkin(carga_id):
     try:
-        dados = request.get_json(silent=True) or {}
-        aa = dados.get("aa_responsavel")
+        data = request.get_json(silent=True) or {}
+        aa_login = data.get("aa_responsavel") or data.get("login") or data.get("aa_login")
 
-        if not aa:
+        if not aa_login:
             return jsonify({"error": "AA não informado"}), 400
 
         carga = Carga.query.get(carga_id)
@@ -119,20 +89,17 @@ def checkin(carga_id):
             return jsonify({"error": "Carga não encontrada"}), 404
 
         carga.status = "checkin"
-        carga.aa_responsavel = aa
-        carga.start_time = now_utc_naive()
+        carga.aa_responsavel = aa_login
+        carga.start_time = datetime.now(timezone.utc)
 
         db.session.commit()
-        return jsonify({"message": "Checkin realizado"}), 200
+        return jsonify({"message": "Checkin realizado"})
 
     except Exception:
         current_app.logger.exception("Erro em /pc/checkin")
         return jsonify({"error": "Erro interno"}), 500
 
 
-# =====================================================
-# FINALIZAR
-# =====================================================
 @painel_bp.route("/finalizar/<int:carga_id>", methods=["POST"])
 def finalizar(carga_id):
     try:
@@ -140,16 +107,17 @@ def finalizar(carga_id):
         if not carga:
             return jsonify({"error": "Carga não encontrada"}), 404
 
-        start_time = to_naive(carga.start_time)
-        if not isinstance(start_time, datetime):
+        start_time = to_aware_utc(carga.start_time)
+        if not start_time:
             return jsonify({"error": "Carga não iniciada"}), 400
 
-        end_time = now_utc_naive()
-        tempo_total_segundos = int((end_time - start_time).total_seconds())
+        end_time = datetime.now(timezone.utc)
 
-        units = int(carga.units or 0)
-        horas = tempo_total_segundos / 3600 if tempo_total_segundos > 0 else 0
-        units_por_hora = round(units / horas, 2) if horas > 0 else 0
+        tempo_total_segundos = int((end_time - start_time).total_seconds())
+        units = carga.units or 0
+
+        tempo_total_horas = tempo_total_segundos / 3600
+        units_por_hora = round(units / tempo_total_horas, 2) if tempo_total_horas > 0 else 0
 
         carga.status = "closed"
         carga.end_time = end_time
@@ -157,30 +125,25 @@ def finalizar(carga_id):
         carga.units_por_hora = units_por_hora
 
         db.session.commit()
-        return jsonify({"message": "Carga finalizada"}), 200
+        return jsonify({"message": "Carga finalizada"})
 
     except Exception:
         current_app.logger.exception("Erro em /pc/finalizar")
         return jsonify({"error": "Erro interno"}), 500
 
 
-# =====================================================
-# LIMPAR BANCO
-# =====================================================
 @painel_bp.route("/limpar-banco", methods=["DELETE"])
 def limpar_banco():
     try:
         deletadas = db.session.query(Carga).delete(synchronize_session=False)
         db.session.commit()
-        return jsonify({"message": "Banco limpo com sucesso", "deletadas": int(deletadas or 0)}), 200
+        return jsonify({"message": "Banco limpo com sucesso", "deletadas": int(deletadas or 0)})
+
     except Exception:
         current_app.logger.exception("Erro em /pc/limpar-banco")
         return jsonify({"error": "Erro interno"}), 500
 
 
-# =====================================================
-# DELETAR (soft delete)
-# =====================================================
 @painel_bp.route("/deletar/<int:carga_id>", methods=["POST"])
 def deletar_carga(carga_id):
     try:
@@ -196,83 +159,120 @@ def deletar_carga(carga_id):
 
         carga.status = "deleted"
         carga.delete_reason = motivo
-        carga.deleted_at = now_utc_naive()
+        carga.deleted_at = datetime.now(timezone.utc)
 
         db.session.commit()
-        return jsonify({"message": "Carga marcada como deletada"}), 200
+        return jsonify({"message": "Carga marcada como deletada"})
 
     except Exception:
         current_app.logger.exception("Erro em /pc/deletar")
         return jsonify({"error": "Erro interno"}), 500
 
 
-# =====================================================
-# AA DISPONÍVEIS (via MOVIMENTAÇÕES + tabela OPERADORES)
-# =====================================================
+# =========================
+# AAs disponíveis (LÓGICA CORRETA)
+# =========================
 @painel_bp.route("/aa-disponiveis")
 def aa_disponiveis():
     """
-    Regra:
-    - Puxa AAs da tabela operadores
-    - Descobre o ÚLTIMO movimento por badge na tabela movimentos (ORDER BY criado_em DESC)
-    - Disponível se o último movimento tiver processo_destino = 'DOCA IN'
-    - Ignora quem está com falta = true
+    REGRAS (como você definiu):
+
+    - APARECE se:
+      (A) operador.processo_atual == 'DOCA IN'  (quando LaborDash estiver alimentando isso)
+      OU
+      (B) último movimento: processo_destino='DOCA IN' e status='ativo'
+      OU
+      (C) pertence originalmente à DOCA (existe movimento com processo_origem='DOCA IN')
+          e NÃO está ativo em outro processo.
+
+    - NÃO APARECE se:
+      último movimento status='ativo' e processo_destino != 'DOCA IN'
+      (ou seja: está ativo em outro processo)
     """
     try:
         query = text("""
-            WITH ultimo_mov AS (
+            WITH last_move AS (
                 SELECT DISTINCT ON (m.badge)
-                       m.badge,
-                       m.nome,
-                       m.processo_destino,
-                       m.criado_em,
-                       m.data_inicio,
-                       m.data_fim,
-                       m.status
+                    m.badge,
+                    m.processo_origem,
+                    m.processo_destino,
+                    m.status,
+                    COALESCE(m.criado_em, m.data_inicio) AS ts
                 FROM movimentos m
-                WHERE m.badge IS NOT NULL
-                ORDER BY m.badge, m.criado_em DESC NULLS LAST, m.data_inicio DESC NULLS LAST
+                ORDER BY m.badge, COALESCE(m.criado_em, m.data_inicio) DESC
+            ),
+            home_doca AS (
+                SELECT DISTINCT badge
+                FROM movimentos
+                WHERE processo_origem = 'DOCA IN'
             )
             SELECT
                 o.login,
-                o.nome AS nome_operador,
+                o.nome,
                 o.badge,
-                o.tag,
-                o.setor,
-                o.turno,
-                o.cargo,
-                o.processo_atual,
                 o.emprestado,
                 o.falta,
-                um.processo_destino,
-                um.criado_em
+                o.processo_atual,
+                lm.processo_origem AS lm_origem,
+                lm.processo_destino AS lm_destino,
+                lm.status AS lm_status,
+                (hd.badge IS NOT NULL) AS pertence_doca
             FROM operadores o
-            LEFT JOIN ultimo_mov um
-                   ON (um.badge::text = o.badge::text OR um.badge::text = o.tag::text)
+            LEFT JOIN last_move lm ON lm.badge = o.badge
+            LEFT JOIN home_doca hd ON hd.badge = o.badge
             WHERE o.cargo = 'AA'
-              AND COALESCE(o.falta, false) = false
-              AND um.processo_destino = 'DOCA IN'
-            ORDER BY o.nome;
         """)
 
-        result = db.session.execute(query).mappings().all()
+        rows = db.session.execute(query).mappings().all()
 
-        lista = []
-        for r in result:
-            lista.append({
-                "login": r.get("login"),
-                "nome": r.get("nome_operador") or r.get("nome"),
-                "badge": r.get("badge") or r.get("tag"),
-                "setor": r.get("setor"),
-                "turno": r.get("turno"),
-                "emprestado": bool(r.get("emprestado") or False),
-                "processo_destino": r.get("processo_destino"),
-                "ultima_movimentacao": dt_to_iso(to_naive(r.get("criado_em"))),
-            })
+        disponiveis = []
+        for r in rows:
+            if r.get("falta"):
+                continue
+            if r.get("emprestado"):
+                continue
 
-        return jsonify(lista), 200
+            processo_atual = (r.get("processo_atual") or "").upper()
+            lm_destino = (r.get("lm_destino") or "").upper()
+            lm_status = (r.get("lm_status") or "").lower()
+            pertence_doca = bool(r.get("pertence_doca"))
+
+            # (A) está em DOCA IN pelo operador
+            if processo_atual == "DOCA IN":
+                disponiveis.append({
+                    "login": r["login"],
+                    "nome": r["nome"],
+                    "badge": r["badge"],
+                    "emprestado": bool(r["emprestado"])
+                })
+                continue
+
+            # Se está ATIVO em outro processo -> bloqueia
+            if lm_status == "ativo" and lm_destino and lm_destino != "DOCA IN":
+                continue
+
+            # (B) ATIVO com destino DOCA IN -> aparece
+            if lm_status == "ativo" and lm_destino == "DOCA IN":
+                disponiveis.append({
+                    "login": r["login"],
+                    "nome": r["nome"],
+                    "badge": r["badge"],
+                    "emprestado": bool(r["emprestado"])
+                })
+                continue
+
+            # (C) pertence originalmente à DOCA (origem DOCA IN em algum momento)
+            # e não está ativo fora -> aparece mesmo se o último movimento estiver inativo
+            if pertence_doca:
+                disponiveis.append({
+                    "login": r["login"],
+                    "nome": r["nome"],
+                    "badge": r["badge"],
+                    "emprestado": bool(r["emprestado"])
+                })
+
+        return jsonify(disponiveis)
 
     except Exception:
         current_app.logger.exception("Erro em /pc/aa-disponiveis")
-        # seu print da imagem: você colocou return jsonify([]),200 no except -> manter
         return jsonify([]), 200
