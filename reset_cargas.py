@@ -36,9 +36,14 @@ def run():
       id SERIAL PRIMARY KEY,
 
       appointment_id VARCHAR(80) UNIQUE,
+
+      -- NOVAS COLUNAS (coluna B do upload)
+      truck_type VARCHAR(30) NULL,   -- OTHER / CARP / TRANSSHIP
+      truck_tipo VARCHAR(30) NULL,   -- VDD / Transferência
+
       expected_arrival_date TIMESTAMP NULL,
       priority_last_update TIMESTAMP NULL,
-      priority_score INTEGER NULL,
+      priority_score DOUBLE PRECISION NULL, -- era INTEGER, mas no upload vem float
       prioridade_maxima BOOLEAN NOT NULL DEFAULT FALSE,
       status VARCHAR(30) NOT NULL DEFAULT 'arrival',
       cartons INTEGER NOT NULL DEFAULT 0,
@@ -48,7 +53,7 @@ def run():
       start_time TIMESTAMP NULL,
       end_time TIMESTAMP NULL,
       tempo_total_segundos INTEGER NULL,
-      units_por_hora INTEGER NULL,
+      units_por_hora DOUBLE PRECISION NULL, -- pode ser decimal
 
       delete_reason VARCHAR(255) NULL,
       deleted_at TIMESTAMP NULL,
@@ -60,7 +65,7 @@ def run():
     with engine.begin() as conn:
         conn.execute(text(ddl))
 
-    print("✅ Tabela 'cargas' recriada com sucesso.")
+    print("✅ Tabela 'cargas' recriada com sucesso (com truck_type e truck_tipo).")
 
 
 if __name__ == "__main__":
