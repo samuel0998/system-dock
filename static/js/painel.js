@@ -37,6 +37,7 @@ function renderizarTabela(cargas) {
 
         tr.innerHTML = `
             <td>${carga.appointment_id ?? "-"}</td>
+            <td>${carga.truck_tipo ?? "-"}</td>
             <td>${formatarData(carga.expected_arrival_date)}</td>
             <td>${carga.units ?? 0}</td>
             <td>${carga.cartons ?? 0}</td>

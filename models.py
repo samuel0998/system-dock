@@ -9,6 +9,9 @@ class Carga(db.Model):
 
     appointment_id = db.Column(db.String(80), nullable=False, index=True)
 
+    truck_type = db.Column(db.String(30))
+    truck_tipo = db.Column(db.String(30))
+
     expected_arrival_date = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
     priority_last_update = db.Column(db.DateTime(timezone=True), nullable=False)
 
