@@ -62,7 +62,7 @@ def listar_cargas():
 
             # ✅ TIPOS (para preencher a coluna "Tipo" no front)
             "truck_type": getattr(c, "truck_type", None),
-            
+            "truck_tipo": getattr(c, "truck_tipo", None),
 
             "expected_arrival_date": c.expected_arrival_date.isoformat() if c.expected_arrival_date else None,
             "units": c.units or 0,
