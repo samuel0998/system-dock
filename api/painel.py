@@ -46,30 +46,33 @@ def listar_cargas():
     lista = []
 
     for c in cargas:
-        expected = _to_aware_utc(c.expected_arrival_date)
+        # regra no-show automático (cuidar timezone se sua coluna vier naive)
+        if c.status == "arrival" and isinstance(c.expected_arrival_date, datetime):
+            expected = c.expected_arrival_date
+            if expected.tzinfo is None:
+                expected = expected.replace(tzinfo=timezone.utc)
 
-        # no-show automático (24h após expected_arrival_date)
-        if c.status == "arrival" and expected:
             limite_no_show = expected + timedelta(hours=24)
             if agora > limite_no_show:
                 c.status = "no_show"
 
-        start_time = _to_aware_utc(c.start_time)
+        lista.append({
+            "id": c.id,
+            "appointment_id": c.appointment_id,
 
-        lista.append(
-            {
-                "id": c.id,
-                "appointment_id": c.appointment_id,
-                "expected_arrival_date": expected.isoformat() if expected else None,
-                "units": c.units or 0,
-                "cartons": c.cartons or 0,
-                "status": c.status,
-                "aa_responsavel": c.aa_responsavel,
-                "priority_score": c.priority_score or 0,
-                "start_time": start_time.isoformat() if start_time else None,
-                "tempo_total_segundos": c.tempo_total_segundos,
-            }
-        )
+            # ✅ TIPOS (para preencher a coluna "Tipo" no front)
+            "truck_type": getattr(c, "truck_type", None),
+            
+
+            "expected_arrival_date": c.expected_arrival_date.isoformat() if c.expected_arrival_date else None,
+            "units": c.units or 0,
+            "cartons": c.cartons or 0,
+            "status": c.status,
+            "aa_responsavel": c.aa_responsavel,
+            "priority_score": float(c.priority_score or 0),
+            "start_time": c.start_time.isoformat() if c.start_time else None,
+            "tempo_total_segundos": c.tempo_total_segundos
+        })
 
     db.session.commit()
     return jsonify(lista)
