@@ -82,7 +82,7 @@ def _status_do_sistema(plan_status_raw: object) -> str | None:
     """
     LÓGICA DO SISTEMA (não copia status livremente)
     - ARRIVAL_SCHEDULED -> arrival_scheduled
-    - CLOSED -> None (ignora)
+    - CLOSED/DELETED -> None (ignora)
     - qualquer outro -> arrival
     """
     if plan_status_raw is None or (isinstance(plan_status_raw, float) and pd.isna(plan_status_raw)):
@@ -97,7 +97,7 @@ def _status_do_sistema(plan_status_raw: object) -> str | None:
 
     if s == "ARRIVAL_SCHEDULED":
         return "arrival_scheduled"
-    if s == "CLOSED":
+    if s in ("CLOSED", "DELETED"):
         return None
 
     return "arrival"
@@ -184,7 +184,7 @@ def processar_planilha():
             plan_status = _get_col(row, "Status", "STATUS", default=None)
             status = _status_do_sistema(plan_status)
 
-            # CLOSED -> ignorar
+            # CLOSED/DELETED -> ignorar
             if status is None:
                 ignoradas += 1
                 continue
