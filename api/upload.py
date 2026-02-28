@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify
 import pandas as pd
 from datetime import datetime, timezone
 
@@ -13,24 +13,61 @@ def upload_page():
     return render_template("upload.html")
 
 
-def _get_col(row, *names, default=None):
-    """
-    Pega a primeira coluna existente (case insensitive) dentre as opções.
-    Ex: _get_col(row, "Units", "UNITS", "units")
-    """
-    # match direto
-    for n in names:
-        if n in row and pd.notna(row.get(n)):
-            return row.get(n)
+def _norm(s: str) -> str:
+    """Normaliza nome de coluna: lower, remove espaços/underscore/traços."""
+    return (
+        str(s)
+        .strip()
+        .lower()
+        .replace(" ", "")
+        .replace("_", "")
+        .replace("-", "")
+    )
 
-    # match case-insensitive
-    row_keys_lower = {str(k).strip().lower(): k for k in row.index}
-    for n in names:
-        key = row_keys_lower.get(str(n).strip().lower())
-        if key is not None and pd.notna(row.get(key)):
-            return row.get(key)
 
+def _build_colmap(df: pd.DataFrame) -> dict:
+    """Mapeia nome normalizado -> nome real."""
+    return {_norm(c): c for c in df.columns}
+
+
+def _get(row, colmap, *names, default=None):
+    """
+    Pega valor de uma coluna por vários nomes possíveis (normalizados).
+    """
+    for n in names:
+        key = _norm(n)
+        real = colmap.get(key)
+        if real is not None:
+            val = row.get(real)
+            if pd.notna(val):
+                return val
     return default
+
+
+def _to_utc_aware(dt):
+    if dt is None or pd.isna(dt):
+        return None
+    d = pd.to_datetime(dt, errors="coerce")
+    if pd.isna(d):
+        return None
+
+    # Se vier com tz, converte; se vier "BRT" (bagunçado), remove tz
+    try:
+        if getattr(d, "tzinfo", None) is not None:
+            d = d.tz_convert("UTC")
+    except Exception:
+        try:
+            d = d.tz_localize(None)
+        except Exception:
+            pass
+
+    py = d.to_pydatetime()
+    if py.tzinfo is None:
+        py = py.replace(tzinfo=timezone.utc)
+    else:
+        py = py.astimezone(timezone.utc)
+
+    return py
 
 
 def _normalize_type(raw):
@@ -38,7 +75,6 @@ def _normalize_type(raw):
     Coluna B (Type):
       - OTHER / CARP => VDD
       - TRANSSHIP => Transferência
-    Retorna: (truck_type_bruto, truck_tipo_normalizado)
     """
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
         return None, None
@@ -48,14 +84,10 @@ def _normalize_type(raw):
         return None, None
 
     up = s.upper()
-
-    # normaliza erros comuns
     up = (
         up.replace("TRASNSSHIP", "TRANSSHIP")
-          .replace("TRASNSHIP", "TRANSSHIP")
           .replace("TRANS SHIP", "TRANSSHIP")
           .replace("TRANS-SHIP", "TRANSSHIP")
-          .replace("TRANSSHIPMENT", "TRANSSHIP")
     )
 
     if up in ("OTHER", "CARP"):
@@ -69,77 +101,22 @@ def _normalize_type(raw):
 def _normalize_status(raw):
     """
     Status vindo da planilha:
-      - ARRIVAL_SCHEDULED -> arrival_scheduled
-      - ARRIVAL -> arrival
-      - CHECKIN -> checkin
-      - CLOSED / CONCLUIDAS -> closed
-      - NO_SHOW -> no_show
-    Se não vier, default = arrival
+    ARRIVAL_SCHEDULED, ARRIVED, CHECKIN_SCHEDULED, CHECKIN, CLOSED, NO_SHOW...
     """
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
-        return "arrival"
+        return None
 
-    s = str(raw).strip()
+    s = str(raw).strip().upper()
     if not s:
-        return "arrival"
-
-    up = s.upper().replace(" ", "_")
-
-    if up == "ARRIVAL_SCHEDULED":
-        return "arrival_scheduled"
-    if up == "ARRIVAL":
-        return "arrival"
-    if up == "CHECKIN":
-        return "checkin"
-    if up in ("CLOSED", "CONCLUIDAS", "CONCLUÍDAS", "CONCLUIDA", "CONCLUÍDA"):
-        return "closed"
-    if up in ("NO_SHOW", "NOSHOW"):
-        return "no_show"
-
-    # fallback seguro
-    return "arrival"
-
-
-def _to_utc_aware(dt):
-    """
-    Converte datetime do pandas em datetime aware UTC.
-    - Se vier tz-aware, converte pra UTC.
-    - Se vier naive, assume UTC.
-    - Se vier string com 'BRT' (não reconhecida), remove e assume UTC.
-    """
-    if dt is None or pd.isna(dt):
         return None
 
-    # trata strings com timezone "BRT" (pandas warning)
-    if isinstance(dt, str) and "BRT" in dt.upper():
-        dt = dt.upper().replace(" BRT", "").strip()
+    # normalizações
+    if s == "ARRIVED":
+        return "ARRIVAL"
+    if s == "NO SHOW":
+        return "NO_SHOW"
 
-    try:
-        d = pd.to_datetime(dt, errors="coerce")
-    except Exception:
-        return None
-
-    if pd.isna(d):
-        return None
-
-    # d pode ser Timestamp tz-aware
-    try:
-        if getattr(d, "tzinfo", None) is not None:
-            try:
-                d = d.tz_convert("UTC")
-            except Exception:
-                d = d.tz_localize(None)
-    except Exception:
-        pass
-
-    py = d.to_pydatetime()
-
-    if py.tzinfo is None:
-        py = py.replace(tzinfo=timezone.utc)
-    else:
-        py = py.astimezone(timezone.utc)
-
-    return py
+    return s
 
 
 @upload_bp.route("/processar", methods=["POST"])
@@ -153,119 +130,107 @@ def processar_planilha():
     except Exception as e:
         return jsonify({"message": f"Erro ao ler arquivo Excel: {str(e)}"}), 400
 
+    # DEBUG (vai aparecer no log do Railway)
+    print("📌 COLUNAS DO EXCEL:", list(df.columns))
+
+    colmap = _build_colmap(df)
+
     inseridas = 0
     ignoradas = 0
     objetos = []
     agora = datetime.now(timezone.utc)
 
     for _, row in df.iterrows():
-        try:
-            # Appointment ID (coluna A)
-            appointment_id = row.iloc[0] if len(row) > 0 else None
-            if appointment_id is None or pd.isna(appointment_id):
-                ignoradas += 1
-                continue
-            appointment_id = str(appointment_id).strip()
-
-            # Type (coluna B)
-            type_raw = row.iloc[1] if len(row) > 1 else None
-            truck_type, truck_tipo = _normalize_type(type_raw)
-
-            # Units
-            units_raw = _get_col(row, "Units", "UNITS", "units", default=0)
-            try:
-                if pd.isna(units_raw) or float(units_raw) == 0:
-                    ignoradas += 1
-                    continue
-                units = int(float(units_raw))
-            except Exception:
-                ignoradas += 1
-                continue
-
-            # Datas
-            expected_arrival = _to_utc_aware(_get_col(row, "Expected Arrival Date", default=None))
-            priority_last_update = _to_utc_aware(_get_col(row, "Priority Score Last Updated Date", default=None))
-            if not expected_arrival or not priority_last_update:
-                ignoradas += 1
-                continue
-
-            # Status (se existir na planilha)
-            # Ajuste os nomes se sua planilha usar outro cabeçalho.
-            status_raw = _get_col(row, "Status", "STATUS", "Appointment Status", "APPOINTMENT STATUS", default="ARRIVAL")
-            status = _normalize_status(status_raw)
-
-            # Outros campos
-            priority_score_raw = _get_col(row, "Priority Score", default=0) or 0
-            cartons_raw = _get_col(row, "Cartons", default=0) or 0
-
-            try:
-                priority_score = float(priority_score_raw)
-            except Exception:
-                priority_score = 0.0
-
-            try:
-                cartons = int(float(cartons_raw))
-            except Exception:
-                cartons = 0
-
-            prioridade_maxima = priority_last_update < expected_arrival
-
-            # ✅ IMPORTANTE:
-            # - Se vier arrival_scheduled, NÃO inicia arrived_at/deadline aqui.
-            # - Só inicia quando clicar "CARGA CHEGOU".
-            objetos.append(
-                Carga(
-                    appointment_id=appointment_id,
-                    expected_arrival_date=expected_arrival,
-                    priority_score=priority_score,
-                    priority_last_update=priority_last_update,
-                    status=status,
-                    cartons=cartons,
-                    units=units,
-
-                    truck_type=truck_type,
-                    truck_tipo=truck_tipo,
-
-                    aa_responsavel=None,
-                    start_time=None,
-                    end_time=None,
-                    tempo_total_segundos=None,
-                    units_por_hora=None,
-                    prioridade_maxima=prioridade_maxima,
-                    created_at=agora,
-
-                    # campos novos (se existirem no model)
-                    arrived_at=None,
-                    sla_setar_aa_deadline=None,
-                    atraso_segundos=0,
-                    atraso_registrado=False,
-                )
-            )
-            inseridas += 1
-
-        except Exception:
-            current_app.logger.exception("Erro ao processar linha do upload")
+        # Appointment ID (coluna A)
+        appointment_id = row.iloc[0] if len(row) > 0 else None
+        if pd.isna(appointment_id):
             ignoradas += 1
+            continue
+
+        # Type (coluna B)
+        type_raw = row.iloc[1] if len(row) > 1 else None
+        truck_type, truck_tipo = _normalize_type(type_raw)
+
+        # Status (procura por nome, e se não achar tenta por posições comuns)
+        status_raw = _get(row, colmap, "Status", "STATUS", default=None)
+        if status_raw is None and len(row) > 7:
+            # fallback (se sua planilha tiver status perto do fim)
+            status_raw = row.iloc[7]
+        status_planilha = _normalize_status(status_raw)
+        if not status_planilha:
+            ignoradas += 1
+            continue
+
+        # Units (nome + fallback por posição)
+        units_raw = _get(row, colmap, "Units", "UNITS", "Total Units", "TotalUnits", default=None)
+        if units_raw is None and len(row) > 8:
+            units_raw = row.iloc[8]  # fallback: ajuste se necessário
+        if units_raw is None or pd.isna(units_raw):
+            ignoradas += 1
+            continue
+
+        try:
+            units = int(float(units_raw))
+        except Exception:
+            ignoradas += 1
+            continue
+
+        # Cartons (nome + fallback por posição)
+        cartons_raw = _get(row, colmap, "Cartons", "CARTONS", default=None)
+        if cartons_raw is None and len(row) > 9:
+            cartons_raw = row.iloc[9]
+        try:
+            cartons = int(float(cartons_raw)) if cartons_raw is not None and pd.notna(cartons_raw) else 0
+        except Exception:
+            cartons = 0
+
+        # Datas
+        expected_arrival = _to_utc_aware(_get(row, colmap, "Expected Arrival Date", default=None))
+        priority_last_update = _to_utc_aware(_get(row, colmap, "Priority Score Last Updated Date", default=None))
+
+        if not expected_arrival or not priority_last_update:
+            ignoradas += 1
+            continue
+
+        # Priority Score
+        priority_score_raw = _get(row, colmap, "Priority Score", default=0) or 0
+        try:
+            priority_score = float(priority_score_raw)
+        except Exception:
+            priority_score = 0.0
+
+        prioridade_maxima = priority_last_update < expected_arrival
+
+        objetos.append(
+            Carga(
+                appointment_id=str(appointment_id),
+                expected_arrival_date=expected_arrival,
+                priority_score=priority_score,
+                priority_last_update=priority_last_update,
+                status=status_planilha,  # ✅ salva o status REAL da planilha
+                cartons=cartons,
+                units=units,
+
+                truck_type=truck_type,
+                truck_tipo=truck_tipo,
+
+                aa_responsavel=None,
+                start_time=None,
+                end_time=None,
+                tempo_total_segundos=None,
+                units_por_hora=None,
+                prioridade_maxima=prioridade_maxima,
+                created_at=agora,
+            )
+        )
+        inseridas += 1
 
     if objetos:
-        # evita erro caso tenha appointment_id repetido (UNIQUE) -> grava um por um
-        # (bulk_save_objects explode e aborta tudo)
-        salvas = 0
-        for obj in objetos:
-            try:
-                db.session.add(obj)
-                db.session.flush()
-                salvas += 1
-            except Exception:
-                db.session.rollback()
-                ignoradas += 1
+        db.session.bulk_save_objects(objetos)
         db.session.commit()
-        inseridas = salvas
 
-    return jsonify(
-        {
-            "message": "Upload concluído com sucesso!",
-            "inseridas": inseridas,
-            "ignoradas": ignoradas,
-        }
-    )
+    return jsonify({
+        "message": "Upload concluído com sucesso!",
+        "inseridas": inseridas,
+        "ignoradas": ignoradas,
+    })
