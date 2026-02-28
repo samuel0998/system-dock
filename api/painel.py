@@ -40,42 +40,81 @@ def painel_page():
 # =====================================================
 @painel_bp.route("/listar")
 def listar_cargas():
-    agora = datetime.now(timezone.utc)
+    try:
+        agora = datetime.now(timezone.utc)
 
-    cargas = Carga.query.order_by(Carga.expected_arrival_date.asc()).all()
-    lista = []
+        cargas = Carga.query.order_by(Carga.expected_arrival_date.asc()).all()
+        lista = []
+        mudou_algo = False
 
-    for c in cargas:
-        # regra no-show automático (cuidar timezone se sua coluna vier naive)
-        if c.status == "arrival" and isinstance(c.expected_arrival_date, datetime):
+        for c in cargas:
             expected = c.expected_arrival_date
-            if expected.tzinfo is None:
+            if expected and expected.tzinfo is None:
                 expected = expected.replace(tzinfo=timezone.utc)
 
-            limite_no_show = expected + timedelta(hours=24)
-            if agora > limite_no_show:
-                c.status = "no_show"
+            # ✅ NO SHOW só para ARRIVAL_SCHEDULED (24h após expected)
+            if c.status == "arrival_scheduled" and expected:
+                if agora > (expected + timedelta(hours=24)):
+                    c.status = "no_show"
+                    mudou_algo = True
 
-        lista.append({
-            "id": c.id,
-            "appointment_id": c.appointment_id,
+            tempo_sla_segundos = None
 
-            # ✅ TIPOS (para preencher a coluna "Tipo" no front)
-            "truck_type": getattr(c, "truck_type", None),
-            "truck_tipo": getattr(c, "truck_tipo", None),
+            # ✅ SLA só existe em ARRIVAL (4h após clicar "CARGA CHEGOU")
+            if c.status == "arrival":
+                if c.sla_setar_aa_deadline is None:
+                    # fallback defensivo caso algum registro antigo esteja sem deadline
+                    base = c.arrived_at or agora
+                    c.arrived_at = c.arrived_at or base
+                    c.sla_setar_aa_deadline = base + timedelta(hours=4)
+                    mudou_algo = True
 
-            "expected_arrival_date": c.expected_arrival_date.isoformat() if c.expected_arrival_date else None,
-            "units": c.units or 0,
-            "cartons": c.cartons or 0,
-            "status": c.status,
-            "aa_responsavel": c.aa_responsavel,
-            "priority_score": float(c.priority_score or 0),
-            "start_time": c.start_time.isoformat() if c.start_time else None,
-            "tempo_total_segundos": c.tempo_total_segundos
-        })
+                deadline = c.sla_setar_aa_deadline
+                if deadline and deadline.tzinfo is None:
+                    deadline = deadline.replace(tzinfo=timezone.utc)
 
-    db.session.commit()
-    return jsonify(lista)
+                tempo_sla_segundos = int((deadline - agora).total_seconds())
+
+                # ✅ registrador de atraso persistente (mesmo se depois setar AA)
+                if tempo_sla_segundos < 0:
+                    atraso_atual = abs(tempo_sla_segundos)
+                    if (not c.atraso_registrado) or (atraso_atual > int(c.atraso_segundos or 0)):
+                        c.atraso_segundos = atraso_atual
+                        c.atraso_registrado = True
+                        mudou_algo = True
+
+            lista.append({
+                "id": c.id,
+                "appointment_id": c.appointment_id,
+
+                "truck_type": getattr(c, "truck_type", None),
+                "truck_tipo": getattr(c, "truck_tipo", None),
+
+                "expected_arrival_date": c.expected_arrival_date.isoformat() if c.expected_arrival_date else None,
+                "status": c.status,
+
+                "units": int(c.units or 0),
+                "cartons": int(c.cartons or 0),
+                "aa_responsavel": c.aa_responsavel,
+
+                # ✅ tempo do SLA (front decide se mostra vermelho quando negativo)
+                "tempo_sla_segundos": tempo_sla_segundos,
+
+                # ✅ atraso persistido
+                "atraso_segundos": int(c.atraso_segundos or 0),
+                "atraso_registrado": bool(c.atraso_registrado),
+
+                "priority_score": float(c.priority_score or 0),
+            })
+
+        if mudou_algo:
+            db.session.commit()
+
+        return jsonify(lista), 200
+
+    except Exception:
+        current_app.logger.exception("Erro em /pc/listar")
+        return jsonify([]), 200
 
 
 @painel_bp.route("/checkin/<int:carga_id>", methods=["POST"])
@@ -156,6 +195,28 @@ def deletar_carga(carga_id):
 
     db.session.commit()
     return jsonify({"message": "Carga marcada como deletada"})
+
+
+
+@painel_bp.route("/carga-chegou/<int:carga_id>", methods=["POST"])
+def carga_chegou(carga_id):
+    try:
+        c = Carga.query.get_or_404(carga_id)
+
+        if c.status != "arrival_scheduled":
+            return jsonify({"message": "Carga não está em ARRIVAL_SCHEDULED."}), 400
+
+        agora = datetime.now(timezone.utc)
+        c.status = "arrival"
+        c.arrived_at = agora
+        c.sla_setar_aa_deadline = agora + timedelta(hours=4)
+
+        db.session.commit()
+        return jsonify({"message": "Status atualizado para ARRIVAL e SLA de 4h iniciado."}), 200
+
+    except Exception:
+        current_app.logger.exception("Erro em /pc/carga-chegou")
+        return jsonify({"message": "Erro interno."}), 500
 
 
 # =====================================================
