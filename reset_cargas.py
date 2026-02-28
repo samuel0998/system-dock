@@ -11,9 +11,11 @@ def get_db_url() -> str:
         or os.getenv("POSTGRESQL_URL")
     )
     if not url:
-        raise RuntimeError("Sem URL do banco no ambiente. Defina DATABASE_URL/SQLALCHEMY_DATABASE_URI.")
+        raise RuntimeError("Sem URL do banco no ambiente (DATABASE_URL / SQLALCHEMY_DATABASE_URI).")
+
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
+
     return url
 
 
@@ -28,52 +30,52 @@ def run():
 
       appointment_id VARCHAR(80) UNIQUE NOT NULL,
 
-      -- ✅ Novo: tipo da carga
-      truck_type VARCHAR(30) NULL,   -- CARP / OTHER / TRANSSHIP (bruto)
-      truck_tipo VARCHAR(30) NULL,   -- VDD / Transferência (mapeado)
-
+      -- Datas principais
       expected_arrival_date TIMESTAMP NULL,
       priority_last_update TIMESTAMP NULL,
-      priority_score NUMERIC NULL,
 
-      -- ✅ Status
-      status VARCHAR(30) NOT NULL DEFAULT 'arrival',
-
+      -- Prioridade / Métricas
+      priority_score DOUBLE PRECISION NULL,
       prioridade_maxima BOOLEAN NOT NULL DEFAULT FALSE,
+
+      -- Status do sistema (sempre lower)
+      -- arrival_scheduled | arrival | checkin | closed | no_show | deleted
+      status VARCHAR(40) NOT NULL DEFAULT 'arrival',
+
       cartons INTEGER NOT NULL DEFAULT 0,
       units INTEGER NOT NULL DEFAULT 0,
 
-      aa_responsavel VARCHAR(80) NULL,
+      -- Tipo de carro (coluna B)
+      truck_type VARCHAR(30) NULL,   -- ex: OTHER / CARP / TRANSSHIP
+      truck_tipo VARCHAR(30) NULL,   -- ex: VDD / Transferência
 
-      -- ✅ Times do processo
+      -- Fluxo operacional
+      aa_responsavel VARCHAR(80) NULL,
       start_time TIMESTAMP NULL,
       end_time TIMESTAMP NULL,
       tempo_total_segundos INTEGER NULL,
-      units_por_hora NUMERIC NULL,
+      units_por_hora DOUBLE PRECISION NULL,
 
-      -- ✅ Novo: controle de chegada e SLA de 4h para setar AA
-      arrived_at TIMESTAMP NULL,          -- quando clicou "CARGA CHEGOU" (virou arrival)
-      sla_setar_aa_deadline TIMESTAMP NULL, -- arrived_at + 4h
+      -- ARRIVAL SLA (quando clicar "CARGA CHEGOU")
+      arrived_at TIMESTAMP NULL,
+      sla_setar_aa_deadline TIMESTAMP NULL,
 
-      -- ✅ Novo: registro de atraso (persistente)
-      atraso_segundos INTEGER NOT NULL DEFAULT 0,     -- maior atraso já registrado (>=0)
+      -- Atraso persistente
       atraso_registrado BOOLEAN NOT NULL DEFAULT FALSE,
+      atraso_segundos INTEGER NOT NULL DEFAULT 0,
 
+      -- Exclusão lógica
       delete_reason VARCHAR(255) NULL,
       deleted_at TIMESTAMP NULL,
 
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-
-    CREATE INDEX IF NOT EXISTS idx_cargas_status ON cargas(status);
-    CREATE INDEX IF NOT EXISTS idx_cargas_expected ON cargas(expected_arrival_date);
-    CREATE INDEX IF NOT EXISTS idx_cargas_deadline ON cargas(sla_setar_aa_deadline);
     """
 
     with engine.begin() as conn:
         conn.execute(text(ddl))
 
-    print("✅ Tabela 'cargas' recriada com sucesso (com ARRIVAL_SCHEDULED + SLA + atraso).")
+    print("✅ Tabela 'cargas' recriada com sucesso (com SLA/Tipo/Atraso).")
 
 
 if __name__ == "__main__":
