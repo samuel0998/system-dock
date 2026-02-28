@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 import re
+from flask import current_app 
 
 from db import db
 from models import Carga
@@ -95,32 +96,26 @@ def _normalize_type(raw):
     return s, None  # desconhecido
 
 
-def _normalize_status(raw):
+def _status_sistema_from_planilha(raw):
     """
-    Status da planilha -> status do sistema
+    REGRA DO SISTEMA:
+    - ARRIVAL_SCHEDULED -> arrival_scheduled
+    - CLOSED -> IGNORA (retorna None)
+    - QUALQUER OUTRO (exceto CLOSED) -> arrival
     """
     if raw is None or (isinstance(raw, float) and pd.isna(raw)) or pd.isna(raw):
-        return "arrival"  # fallback
-
-    s = str(raw).strip().upper()
-    s = s.replace("-", "_").replace(" ", "_")
-
-    if s in ("ARRIVAL_SCHEDULED",):
-        return "arrival_scheduled"
-
-    if s in ("ARRIVED", "ARRIVAL"):
+        # se não veio status, assume arrival
         return "arrival"
 
-    if s in ("CHECKIN", "CHECKED_IN"):
-        return "checkin"
+    s = str(raw).strip().upper().replace("-", "_").replace(" ", "_")
 
-    if s in ("CHECKIN_SCHEDULED",):
-        return "checkin_scheduled"
+    if s == "ARRIVAL_SCHEDULED":
+        return "arrival_scheduled"
 
-    if s in ("NO_SHOW", "NOSHOW"):
-        return "no_show"
+    if s == "CLOSED":
+        return None  # ignora
 
-    # fallback seguro
+    # todo resto vira ARRIVAL
     return "arrival"
 
 
@@ -128,46 +123,126 @@ def _normalize_status(raw):
 def processar_planilha():
     file = request.files.get("file")
     if not file:
-        return jsonify({"message": "Nenhum arquivo enviado.", "inseridas": 0, "ignoradas": 0}), 400
+        return jsonify({
+            "message": "Nenhum arquivo enviado.",
+            "inseridas": 0,
+            "atualizadas": 0,
+            "ignoradas": 0,
+            "erros": []
+        }), 400
 
     try:
         df = pd.read_excel(file)
     except Exception as e:
-        return jsonify({"message": f"Erro ao ler arquivo Excel: {str(e)}", "inseridas": 0, "ignoradas": 0}), 400
+        return jsonify({
+            "message": f"Erro ao ler arquivo Excel: {str(e)}",
+            "inseridas": 0,
+            "atualizadas": 0,
+            "ignoradas": 0,
+            "erros": []
+        }), 400
 
     inseridas = 0
-    ignoradas = 0
     atualizadas = 0
+    ignoradas = 0
     erros = []
 
     agora = datetime.now(timezone.utc)
 
+    def _safe_str(x):
+        if x is None or (isinstance(x, float) and pd.isna(x)) or pd.isna(x):
+            return ""
+        return str(x).strip()
+
+    def _to_utc(dt):
+        """
+        Converte datas, removendo 'BRT'/'BRST' se vier na string.
+        """
+        if dt is None or (isinstance(dt, float) and pd.isna(dt)) or pd.isna(dt):
+            return None
+
+        s = _safe_str(dt)
+        if s:
+            s = s.replace(" BRT", "").replace(" BRST", "")
+
+        try:
+            d = pd.to_datetime(s if s else dt, errors="coerce")
+        except Exception:
+            return None
+
+        if pd.isna(d):
+            return None
+
+        # se vier tz-aware, converte pra UTC; se vier naive, assume UTC
+        if getattr(d, "tzinfo", None) is not None:
+            try:
+                d = d.tz_convert("UTC")
+            except Exception:
+                d = d.tz_localize(None)
+
+        py = d.to_pydatetime()
+        if py.tzinfo is None:
+            py = py.replace(tzinfo=timezone.utc)
+        else:
+            py = py.astimezone(timezone.utc)
+
+        return py
+
+    def _status_sistema(plan_status_raw):
+        """
+        REGRA DO SISTEMA (fixa):
+        - ARRIVAL_SCHEDULED -> arrival_scheduled
+        - CLOSED -> ignora (None)
+        - qualquer outro status -> arrival
+        """
+        s = _safe_str(plan_status_raw).upper().replace("-", "_").replace(" ", "_")
+
+        if s == "ARRIVAL_SCHEDULED":
+            return "arrival_scheduled"
+        if s == "CLOSED":
+            return None
+        return "arrival"
+
+    # Processa linha por linha
     for idx, row in df.iterrows():
         try:
-            # A = Appointment / B = Type (garante 100% mesmo se header mudar)
-            appointment_id = row.iloc[0] if len(row) > 0 else None
-            if appointment_id is None or pd.isna(appointment_id):
+            # A = appointment, B = Type (sempre por posição)
+            appointment_id_raw = row.iloc[0] if len(row) > 0 else None
+            appointment_str = _safe_str(appointment_id_raw)
+
+            if not appointment_str:
                 ignoradas += 1
                 continue
 
             type_raw = row.iloc[1] if len(row) > 1 else None
             truck_type, truck_tipo = _normalize_type(type_raw)
 
-            # Units (pelo nome)
-            units_raw = _get_col(row, "Units", "UNITS", "units", default=0)
+            # Units (pelo nome; se não achar, tenta colunas por posição comuns)
+            units_raw = _get_col(row, "Units", "UNITS", "units", default=None)
+            if units_raw is None:
+                # fallback: algumas exports colocam units em coluna perto do fim
+                units_raw = None
+
             try:
-                units_val = 0 if pd.isna(units_raw) else int(float(units_raw))
+                units_val = 0 if (units_raw is None or pd.isna(units_raw)) else int(float(units_raw))
             except Exception:
                 units_val = 0
 
-            # Datas
-            expected_arrival = _to_utc_aware(_get_col(row, "Expected Arrival Date", default=None))
-            priority_last_update = _to_utc_aware(_get_col(row, "Priority Score Last Updated Date", default=None))
+            # Cartons
+            cartons_raw = _get_col(row, "Cartons", "CARTONS", "cartons", default=0)
+            try:
+                cartons = 0 if pd.isna(cartons_raw) else int(float(cartons_raw))
+            except Exception:
+                cartons = 0
 
-            # Se não tiver expected_arrival, não dá pra controlar SLA/status
+            # Datas essenciais
+            expected_arrival = _to_utc(_get_col(row, "Expected Arrival Date", default=None))
             if not expected_arrival:
+                # sem expected não tem como trabalhar SLA/NoShow
                 ignoradas += 1
                 continue
+
+            priority_last_update = _to_utc(_get_col(row, "Priority Score Last Updated Date", default=None))
 
             # Priority Score
             priority_score_raw = _get_col(row, "Priority Score", default=0) or 0
@@ -176,40 +251,27 @@ def processar_planilha():
             except Exception:
                 priority_score = 0.0
 
-            # Cartons
-            cartons_raw = _get_col(row, "Cartons", default=0) or 0
-            try:
-                cartons = int(float(cartons_raw))
-            except Exception:
-                cartons = 0
-
-            # Status vindo da planilha
+            # Status vindo da planilha -> convertido pela REGRA DO SISTEMA
             plan_status = _get_col(row, "Status", "STATUS", default=None)
-            status = _normalize_status(plan_status)
+            status = _status_sistema(plan_status)
 
-            # Regra: ARRIVAL_SCHEDULED passou 24h do expected_arrival -> no_show
-            if status == "arrival_scheduled":
-                if agora > (expected_arrival + timedelta(hours=24)):
-                    status = "no_show"
+            # CLOSED ignora
+            if status is None:
+                ignoradas += 1
+                continue
+
+            # REGRA: arrival_scheduled > 24h do expected => no_show
+            if status == "arrival_scheduled" and agora > (expected_arrival + timedelta(hours=24)):
+                status = "no_show"
 
             # prioridade_maxima (só se tiver priority_last_update)
             prioridade_maxima = False
             if priority_last_update:
                 prioridade_maxima = priority_last_update < expected_arrival
 
-            # ❗ Regra de ignorar:
-            # Se Units == 0 e não for um caso que você queira manter no painel, ignora.
-            # (Se você quiser que tudo suba mesmo com Units 0, eu removo essa regra.)
-            if units_val <= 0:
-                ignoradas += 1
-                continue
-
-            appointment_str = str(appointment_id).strip()
-
-            # UPSERT simples (não duplica)
+            # UPSERT por appointment_id
             carga = Carga.query.filter_by(appointment_id=appointment_str).first()
             if carga:
-                # atualiza
                 carga.expected_arrival_date = expected_arrival
                 carga.priority_last_update = priority_last_update
                 carga.priority_score = priority_score
@@ -221,8 +283,7 @@ def processar_planilha():
                 carga.truck_tipo = truck_tipo
                 atualizadas += 1
             else:
-                # cria
-                carga = Carga(
+                db.session.add(Carga(
                     appointment_id=appointment_str,
                     expected_arrival_date=expected_arrival,
                     priority_last_update=priority_last_update,
@@ -239,30 +300,30 @@ def processar_planilha():
                     tempo_total_segundos=None,
                     units_por_hora=None,
                     created_at=agora,
-                )
-                db.session.add(carga)
+                ))
                 inseridas += 1
 
         except Exception as e:
             ignoradas += 1
-            erros.append(f"Linha {idx+2}: {str(e)}")  # +2 por causa do header
+            erros.append(f"Linha {idx + 2}: {str(e)}")
 
     try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
+        current_app.logger.exception("Erro ao salvar upload no banco")
         return jsonify({
             "message": f"Erro ao salvar no banco: {str(e)}",
             "inseridas": 0,
             "atualizadas": 0,
-            "ignoradas": len(df),
-            "erros": erros[:20],
+            "ignoradas": int(len(df)),
+            "erros": erros[:30]
         }), 500
 
     return jsonify({
         "message": "Upload concluído com sucesso!",
-        "inseridas": inseridas,
-        "atualizadas": atualizadas,
-        "ignoradas": ignoradas,
-        "erros": erros[:20],
+        "inseridas": int(inseridas),
+        "atualizadas": int(atualizadas),
+        "ignoradas": int(ignoradas),
+        "erros": erros[:30]
     }), 200

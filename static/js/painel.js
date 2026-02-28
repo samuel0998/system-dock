@@ -174,7 +174,7 @@ function checkin(cargaId) {
             fetch(`/pc/checkin/${cargaId}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ aa_responsavel: escolha.login })
+                body: JSON.stringify({ aa_responsavel: escolha })
             })
             .then(() => carregarCargas());
 
