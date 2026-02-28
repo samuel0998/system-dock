@@ -117,9 +117,12 @@ def processar_planilha():
     inseridas = 0
     atualizadas = 0
     ignoradas = 0
+    repetidas_no_arquivo = 0
     erros: list[str] = []
 
     agora = datetime.now(timezone.utc)
+
+    seen_appointments: set[str] = set()
 
     for idx, row in df.iterrows():
         try:
@@ -133,6 +136,11 @@ def processar_planilha():
             if not appointment_str:
                 ignoradas += 1
                 continue
+
+            if appointment_str in seen_appointments:
+                repetidas_no_arquivo += 1
+            else:
+                seen_appointments.add(appointment_str)
 
             type_raw = row.iloc[1] if len(row) > 1 else None
             truck_type, truck_tipo = _normalize_type(type_raw)
@@ -159,6 +167,11 @@ def processar_planilha():
                 cartons_val = 0 if pd.isna(cartons_raw) else int(float(cartons_raw))
             except Exception:
                 cartons_val = 0
+
+            # regra de negócio: cargas com units <= 0 são ignoradas
+            if units_val <= 0:
+                ignoradas += 1
+                continue
 
             # Priority score
             priority_score_raw = _get_col(row, "Priority Score", default=0) or 0
@@ -253,5 +266,7 @@ def processar_planilha():
         "inseridas": inseridas,
         "atualizadas": atualizadas,
         "ignoradas": ignoradas,
+        "repetidas_no_arquivo": repetidas_no_arquivo,
+        "observacao": "Quando o mesmo Appointment ID aparece mais de uma vez, o sistema atualiza o registro já existente em vez de criar uma nova carga.",
         "erros": erros[:30],
     }), 200
