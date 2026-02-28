@@ -168,6 +168,11 @@ def processar_planilha():
             except Exception:
                 cartons_val = 0
 
+            # regra de negócio: cargas com units <= 0 são ignoradas
+            if units_val <= 0:
+                ignoradas += 1
+                continue
+
             # Priority score
             priority_score_raw = _get_col(row, "Priority Score", default=0) or 0
             try:
