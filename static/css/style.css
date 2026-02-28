@@ -42,6 +42,15 @@ th {
     color: white;
 }
 
+
+.linha-atrasada td {
+    background-color: #ffe5e5;
+}
+
+body.dark-mode .linha-atrasada td {
+    background-color: #5b1d1d;
+}
+
 .cards {
     display: flex;
     gap: 20px;
