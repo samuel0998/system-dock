@@ -5,6 +5,7 @@ from flask_cors import CORS
 from api.upload import upload_bp
 from api.painel import painel_bp
 from api.dashboard import dashboard_bp
+from api.transferin import transferin_bp
 
 from db import init_db, db
 import models  # garante que os models sejam importados (Carga etc.)
@@ -49,6 +50,7 @@ def create_app() -> Flask:
     app.register_blueprint(upload_bp)
     app.register_blueprint(painel_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(transferin_bp)
 
     # Healthcheck
     @app.get("/")

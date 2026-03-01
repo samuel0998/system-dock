@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="painel-header">
+        <h2 class="titulo-pagina">TransferIn</h2>
+        <p class="painel-subtitulo">Registro operacional das transferências do dia, prazo Late Stow e acompanhamento em tempo real.</p>
+    </div>
+
+    <div class="filtro-container filtro-container-moderno">
+        <div class="filtro-grupo">
+            <label>Appointment ID</label>
+            <input type="text" id="filtroTransferAppointment" placeholder="Buscar appointment">
+        </div>
+
+        <div class="filtro-grupo">
+            <label>Origem</label>
+            <select id="filtroTransferOrigem">
+                <option value="">Todas</option>
+                <option>CNF2</option>
+                <option>FOR2</option>
+                <option>GIG1</option>
+                <option>GRU9</option>
+                <option>POA1</option>
+                <option>REC1</option>
+                <option>REC3</option>
+                <option>XBRA</option>
+                <option>XCV9</option>
+            </select>
+        </div>
+
+        <div class="filtro-grupo">
+            <label>Status Card</label>
+            <select id="filtroTransferStatus">
+                <option value="">Todos</option>
+                <option value="pendente">Pendente</option>
+                <option value="preenchida">Preenchida</option>
+                <option value="atrasada">Atrasada</option>
+                <option value="finalizada">Finalizada</option>
+            </select>
+        </div>
+
+        <div class="filtro-botoes">
+            <button class="btn-filtrar" onclick="carregarTransferencias()">Filtrar</button>
+            <button class="btn-limpar" onclick="limparFiltrosTransfer()">Limpar</button>
+        </div>
+    </div>
+
+    <div class="tabela-container tabela-container-moderna">
+        <table class="tabela-cargas transfer-table">
+            <thead>
+                <tr>
+                    <th>Appointment ID</th>
+                    <th>Expected Arrival</th>
+                    <th>Status Carga</th>
+                    <th>Units</th>
+                    <th>Cartons</th>
+                    <th>VRID</th>
+                    <th>Origem</th>
+                    <th>Late Stow (prazo)</th>
+                    <th>Tempo Prazo</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaTransferencias"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modalTransferInfo" class="modal-overlay" style="display:none;">
+    <div class="modal-content transfer-modal-content">
+        <div class="transfer-modal-header">
+            <h3>Informações da Transferência</h3>
+            <span class="transfer-pill">Appointment: <strong id="transferAppointmentId">-</strong></span>
+        </div>
+
+        <div class="transfer-form-grid">
+            <div class="filtro-grupo">
+                <label>VRID</label>
+                <input type="text" id="transferVrid" placeholder="Informe o VRID">
+            </div>
+
+            <div class="filtro-grupo">
+                <label>LATE STOW REATIVO/PROATIVO (Data e horário)</label>
+                <input type="datetime-local" id="transferLateStow">
+            </div>
+
+            <div class="filtro-grupo">
+                <label>Origem</label>
+                <select id="transferOrigem">
+                    <option value="">Selecione</option>
+                    <option>CNF2</option>
+                    <option>FOR2</option>
+                    <option>GIG1</option>
+                    <option>GRU9</option>
+                    <option>POA1</option>
+                    <option>REC1</option>
+                    <option>REC3</option>
+                    <option>XBRA</option>
+                    <option>XCV9</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="modal-actions transfer-modal-actions">
+            <button class="btn-confirm transfer-save-btn" onclick="salvarTransferInfo()">Salvar</button>
+            <button class="btn-cancel" onclick="fecharModalTransfer()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/transferin.js') }}"></script>
+{% endblock %}
