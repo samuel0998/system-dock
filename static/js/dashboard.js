@@ -48,6 +48,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.getElementById("filtroAtrasoAppointment")?.addEventListener("input", aplicarFiltrosTabelas);
     document.getElementById("filtroProdLogin")?.addEventListener("input", aplicarFiltrosTabelas);
+    document.getElementById("filtroTransferLateAppointment")?.addEventListener("input", aplicarFiltrosTabelas);
 
     aplicarFiltro();
 });
@@ -86,6 +87,7 @@ function atualizarDashboard(data) {
     animarNumero("totalNotasDeletadas", data.total_notas_deletadas ?? 0);
     animarNumero("totalNotasNoShow", data.total_notas_no_show ?? 0);
     animarNumero("totalCargasAtrasadas", data.total_cargas_atrasadas ?? 0);
+    animarNumero("totalTransferLateStow", data.total_transferencias_late_stow ?? 0);
 
     aplicarFiltrosTabelas();
 
@@ -119,6 +121,7 @@ function aplicarFiltrosTabelas() {
 
     const filtroAppointment = (document.getElementById("filtroAtrasoAppointment")?.value || "").toLowerCase();
     const filtroLogin = (document.getElementById("filtroProdLogin")?.value || "").toLowerCase();
+    const filtroTransferAppointment = (document.getElementById("filtroTransferLateAppointment")?.value || "").toLowerCase();
 
     const atrasadas = (dadosDashboard.cargas_atrasadas || []).filter(c =>
         String(c.appointment_id || "").toLowerCase().includes(filtroAppointment)
@@ -128,8 +131,39 @@ function aplicarFiltrosTabelas() {
         String(login || "").toLowerCase().includes(filtroLogin)
     );
 
+    const transferLate = (dadosDashboard.transferencias_late_stow || []).filter(t =>
+        String(t.appointment_id || "").toLowerCase().includes(filtroTransferAppointment)
+    );
+
     renderizarListaAtrasadas(atrasadas);
     renderizarTabelaProdutividade(produtividade);
+    renderizarTabelaTransferLate(transferLate);
+}
+
+function renderizarTabelaTransferLate(rows) {
+    const tbody = document.getElementById("tabelaTransferLateStow");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="linha-sem-dados">Nenhuma transferência com Late Stow no período.</td></tr>`;
+        return;
+    }
+
+    rows.forEach(t => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${renderAppointmentLink(t.appointment_id)}</td>
+            <td>${t.vrid || "-"}</td>
+            <td>${t.origem || "-"}</td>
+            <td>${formatarDataHora(t.expected_arrival_date)}</td>
+            <td>${formatarDataHora(t.late_stow_deadline)}</td>
+            <td class="atraso-cell">${formatarTempoAtraso(t.tempo_atraso_segundos)}</td>
+            <td>${(t.status || "-").toUpperCase()}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 function renderizarListaAtrasadas(cargas) {
@@ -204,6 +238,14 @@ function formatarDataHora(valor) {
 function formatarStatus(status) {
     if (!status) return "-";
     return String(status).replaceAll("_", " ").toUpperCase();
+}
+
+function renderAppointmentLink(appointmentId) {
+    const id = (appointmentId ?? "").toString().trim();
+    if (!id) return "-";
+
+    const href = `https://dockmaster.na.aftx.amazonoperations.app/pt_BR/#/dockmaster/appointment/GIG2/view/${encodeURIComponent(id)}/appointmentDetail`;
+    return `<a class="appointment-link" href="${href}" target="_blank" rel="noopener noreferrer">${id}</a>`;
 }
 
 function escapeHtml(texto) {

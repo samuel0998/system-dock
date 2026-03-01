@@ -23,6 +23,7 @@ def run():
     engine = create_engine(get_db_url(), future=True, pool_pre_ping=True)
 
     ddl = """
+    DROP TABLE IF EXISTS transferencias CASCADE;
     DROP TABLE IF EXISTS cargas CASCADE;
 
     CREATE TABLE cargas (
@@ -69,6 +70,30 @@ def run():
       -- Exclusão lógica
       delete_reason VARCHAR(255) NULL,
       deleted_at TIMESTAMP NULL,
+
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE transferencias (
+      id SERIAL PRIMARY KEY,
+      appointment_id VARCHAR(80) UNIQUE NOT NULL,
+      carga_id INTEGER NULL,
+
+      expected_arrival_date TIMESTAMP NULL,
+      status_carga VARCHAR(30) NULL,
+      units INTEGER NOT NULL DEFAULT 0,
+      cartons INTEGER NOT NULL DEFAULT 0,
+
+      vrid VARCHAR(80) NULL,
+      late_stow_deadline TIMESTAMP NULL,
+      origem VARCHAR(10) NULL,
+
+      info_preenchida BOOLEAN NOT NULL DEFAULT FALSE,
+      finalizada BOOLEAN NOT NULL DEFAULT FALSE,
+      finished_at TIMESTAMP NULL,
+
+      prazo_estourado BOOLEAN NOT NULL DEFAULT FALSE,
+      prazo_estourado_segundos INTEGER NOT NULL DEFAULT 0,
 
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );

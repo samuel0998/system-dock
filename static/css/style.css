@@ -976,204 +976,37 @@ body.dark-mode .btn-balao {
     color: #e5e7eb;
 }
 
-/* =========================================
-   PAINEL - VISUAL MODERNO
-========================================= */
-.painel-header {
-    margin-bottom: 18px;
-}
-
-.painel-subtitulo {
-    margin: 6px 0 0;
-    color: #64748b;
-    font-size: 14px;
-}
-
-.filtro-container-moderno {
-    background: linear-gradient(160deg, #ffffff 0%, #f8fafc 100%);
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 18px;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-}
-
-.filtro-header {
-    width: 100%;
-    margin-bottom: 6px;
-}
-
-.filtro-header h3 {
-    margin: 0;
-    font-size: 16px;
-    color: #1e293b;
-}
-
-.filtro-header span {
-    font-size: 12px;
-    color: #64748b;
-}
-
-.filtro-container-moderno .filtro-grupo label {
-    font-weight: 600;
-    color: #334155;
-    margin-bottom: 6px;
-}
-
-.filtro-container-moderno .filtro-grupo input,
-.filtro-container-moderno .filtro-grupo select {
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    padding: 8px 10px;
-    min-width: 190px;
-    background: #ffffff;
-}
-
-.filtro-container-moderno .filtro-botoes {
-    margin-top: 22px;
-}
-
-.filtro-container-moderno .btn-filtrar,
-.filtro-container-moderno .btn-limpar {
-    border-radius: 10px;
-    font-weight: 600;
-}
-
-.tabela-container-moderna {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-}
-
-.tabela-container-moderna .tabela-cargas th {
-    background: #1e293b;
-    color: #f8fafc;
-    font-weight: 700;
-}
-
-.tabela-container-moderna .tabela-cargas td {
-    background: #ffffff;
-}
-
-.tabela-container-moderna .tabela-cargas tbody tr:nth-child(even) td {
+.transfer-table tbody tr.transfer-pendente td {
     background: #f8fafc;
 }
 
-.tabela-container-moderna .tabela-cargas tbody tr:hover td {
-    background: #eef2ff;
+.transfer-table tbody tr.transfer-preenchida td {
+    background: #e7f8ee;
 }
 
-/* Garantir destaque vermelho em atraso (maior especificidade que zebra/hover) */
-.tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada td,
-.tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:nth-child(even) td,
-.tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:hover td {
+.transfer-table tbody tr.transfer-atrasada td {
     background: #ffe5e5;
 }
 
-.appointment-link {
-    color: #1d4ed8;
-    font-weight: 700;
-    text-decoration: none;
+.transfer-table tbody tr.transfer-finalizada td {
+    background: #eef2ff;
 }
 
-.appointment-link:hover {
-    text-decoration: underline;
-    color: #1e40af;
-}
-
-body.dark-mode .painel-subtitulo,
-body.dark-mode .filtro-header span {
-    color: #94a3b8;
-}
-
-body.dark-mode .filtro-container-moderno,
-body.dark-mode .tabela-container-moderna {
-    background: #1e293b;
-    border-color: #334155;
-}
-
-body.dark-mode .filtro-header h3,
-body.dark-mode .filtro-container-moderno .filtro-grupo label {
-    color: #e2e8f0;
-}
-
-body.dark-mode .filtro-container-moderno .filtro-grupo input,
-body.dark-mode .filtro-container-moderno .filtro-grupo select {
-    background: #0f172a;
-    border-color: #334155;
-    color: #e2e8f0;
-}
-
-body.dark-mode .tabela-container-moderna .tabela-cargas td {
-    background: #1e293b;
-    color: #e5e7eb;
-}
-
-body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr:nth-child(even) td {
-    background: #172033;
-}
-
-body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr:hover td {
-    background: #253046;
-}
-
-body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada td,
-body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:nth-child(even) td,
-body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:hover td {
-    background: #5b1d1d;
-}
-
-body.dark-mode .appointment-link {
-    color: #93c5fd;
-}
-
-.btn-comentario-atraso {
-    background: #2563eb;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 6px 10px;
-    cursor: pointer;
-    margin-right: 6px;
+.badge-transfer {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
     font-size: 12px;
+    font-weight: 700;
+    text-transform: capitalize;
 }
 
-.btn-comentario-atraso:hover {
-    background: #1d4ed8;
-}
+.badge-pendente { background: #e2e8f0; color: #334155; }
+.badge-preenchida { background: #bbf7d0; color: #166534; }
+.badge-atrasada { background: #fecaca; color: #991b1b; }
+.badge-finalizada { background: #c7d2fe; color: #3730a3; }
 
-.input-filtro-dashboard {
-    margin-left: auto;
-    padding: 8px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    min-width: 220px;
-}
-
-.btn-balao {
-    border: 1px solid #cbd5e1;
-    background: #fff;
-    border-radius: 8px;
-    padding: 4px 8px;
-    cursor: pointer;
-}
-
-.dashboard-lista-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-body.dark-mode .input-filtro-dashboard {
-    background: #111827;
-    color: #e5e7eb;
-    border-color: #374151;
-}
-
-body.dark-mode .btn-balao {
-    background: #1f2937;
-    border-color: #374151;
-    color: #e5e7eb;
-}
+body.dark-mode .transfer-table tbody tr.transfer-pendente td { background: #1e293b; }
+body.dark-mode .transfer-table tbody tr.transfer-preenchida td { background: #1b4332; }
+body.dark-mode .transfer-table tbody tr.transfer-atrasada td { background: #5b1d1d; }
+body.dark-mode .transfer-table tbody tr.transfer-finalizada td { background: #1e3a8a; }

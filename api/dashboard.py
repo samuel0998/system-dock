@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import func
 
 from db import db
-from models import Carga
+from models import Carga, Transferencia
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -34,7 +34,9 @@ def dashboard_stats():
             "por_login": {},
             "total_cargas_atrasadas": 0,
             "produtividade_por_aa": {},
-            "cargas_atrasadas": []
+            "cargas_atrasadas": [],
+            "transferencias_late_stow": [],
+            "total_transferencias_late_stow": 0,
         })
 
     # intervalo UTC (00:00:00 até 23:59:59)
@@ -292,6 +294,44 @@ def dashboard_stats():
             "atraso_comentario": c.atraso_comentario,
         })
 
+    transferencias_rows = (
+        Transferencia.query
+        .filter(
+            Transferencia.expected_arrival_date.isnot(None),
+            Transferencia.expected_arrival_date >= inicio,
+            Transferencia.expected_arrival_date <= fim,
+        )
+        .order_by(Transferencia.expected_arrival_date.asc())
+        .all()
+    )
+
+    transferencias_late = []
+    for t in transferencias_rows:
+        deadline = _to_aware_utc(t.late_stow_deadline)
+        if not deadline:
+            continue
+
+        estourada_agora = (not t.finalizada) and (agora > deadline)
+        estourada_historica = bool(t.prazo_estourado)
+
+        if not estourada_agora and not estourada_historica:
+            continue
+
+        if estourada_agora:
+            atraso_seg = int((agora - deadline).total_seconds())
+        else:
+            atraso_seg = int(t.prazo_estourado_segundos or 0)
+
+        transferencias_late.append({
+            "appointment_id": t.appointment_id,
+            "vrid": t.vrid,
+            "origem": t.origem,
+            "expected_arrival_date": _to_aware_utc(t.expected_arrival_date).isoformat() if t.expected_arrival_date else None,
+            "late_stow_deadline": deadline.isoformat(),
+            "status": "finalizada" if t.finalizada else "em_aberto",
+            "tempo_atraso_segundos": atraso_seg,
+        })
+
     return jsonify({
         "total_units": int(total_units),
         "total_units_no_show": int(total_units_no_show),
@@ -307,5 +347,7 @@ def dashboard_stats():
         "por_login": por_login,
         "produtividade_por_aa": por_login,
         "total_cargas_atrasadas": len(cargas_atrasadas),
-        "cargas_atrasadas": cargas_atrasadas[:50]
+        "cargas_atrasadas": cargas_atrasadas[:50],
+        "total_transferencias_late_stow": len(transferencias_late),
+        "transferencias_late_stow": transferencias_late[:100],
     })

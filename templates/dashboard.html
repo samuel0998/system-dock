@@ -74,6 +74,12 @@
             <p>SLA estourado no período</p>
         </div>
 
+        <div class="card-dashboard card-transfer-late">
+            <div class="card-head"><h4>Transferências Late Stow</h4><span class="card-icon">🚚</span></div>
+            <span id="totalTransferLateStow">0</span>
+            <p>Transferências fora do prazo</p>
+        </div>
+
     </div>
 
     <div class="dashboard-lista-atraso">
@@ -119,6 +125,30 @@
                     </tr>
                 </thead>
                 <tbody id="tabelaProdutividadeAA"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="dashboard-lista-atraso">
+        <div class="dashboard-lista-header">
+            <h4>Transferências com Late Stow</h4>
+            <small>Registros que estouraram o prazo Late Stow</small>
+            <input type="text" id="filtroTransferLateAppointment" placeholder="Filtrar Appointment ID" class="input-filtro-dashboard">
+        </div>
+        <div class="dashboard-lista-wrap">
+            <table class="tabela-cargas-atrasadas">
+                <thead>
+                    <tr>
+                        <th>Appointment ID</th>
+                        <th>VRID</th>
+                        <th>Origem</th>
+                        <th>Expected Arrival</th>
+                        <th>Late Stow</th>
+                        <th>Atraso</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaTransferLateStow"></tbody>
             </table>
         </div>
     </div>
