@@ -121,15 +121,17 @@ function iniciarCronometro(id, startTimeISO) {
 
     timers[id] = setInterval(() => {
         const agora = new Date();
-        const diff = Math.floor((agora - start) / 1000);
+        // checkin é cronômetro crescente, nunca regressivo
+        const diff = Math.max(0, Math.floor((agora - start) / 1000));
         atualizarTempoTela(id, diff);
     }, 1000);
 }
 
 function atualizarTempoTela(id, totalSegundos) {
-    const horas = String(Math.floor(totalSegundos / 3600)).padStart(2, "0");
-    const minutos = String(Math.floor((totalSegundos % 3600) / 60)).padStart(2, "0");
-    const segundos = String(totalSegundos % 60).padStart(2, "0");
+    const t = Math.max(0, Number(totalSegundos || 0));
+    const horas = String(Math.floor(t / 3600)).padStart(2, "0");
+    const minutos = String(Math.floor((t % 3600) / 60)).padStart(2, "0");
+    const segundos = String(t % 60).padStart(2, "0");
 
     const el = document.getElementById(`timer-${id}`);
     if (el) el.innerText = `${horas}:${minutos}:${segundos}`;

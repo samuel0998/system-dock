@@ -93,6 +93,8 @@ def listar_cargas():
                             c.atraso_registrado = True
                             mudou_algo = True
 
+            start_time_utc = _to_aware_utc(c.start_time)
+
             lista.append({
                 "id": c.id,
                 "appointment_id": c.appointment_id,
@@ -106,7 +108,7 @@ def listar_cargas():
                 "units": int(c.units or 0),
                 "cartons": int(c.cartons or 0),
                 "aa_responsavel": c.aa_responsavel,
-                "start_time": c.start_time.isoformat() if c.start_time else None,
+                "start_time": start_time_utc.isoformat() if start_time_utc else None,
                 "tempo_total_segundos": int(c.tempo_total_segundos) if c.tempo_total_segundos is not None else None,
 
                 # ✅ tempo do SLA (front decide se mostra vermelho quando negativo)
