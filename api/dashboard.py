@@ -133,7 +133,8 @@ def dashboard_stats():
         db.session.query(
             Carga.aa_responsavel,
             func.coalesce(func.sum(Carga.units), 0).label("units"),
-            func.count(Carga.id).label("notas")
+            func.count(Carga.id).label("notas"),
+            func.coalesce(func.avg(Carga.units_por_hora), 0).label("produtividade_media")
         )
         .filter(
             Carga.status == "closed",
@@ -147,7 +148,11 @@ def dashboard_stats():
         .all()
     )
     por_login = {
-        r.aa_responsavel: {"units": int(r.units), "notas": int(r.notas)}
+        r.aa_responsavel: {
+            "units": int(r.units),
+            "notas": int(r.notas),
+            "produtividade_media": round(float(r.produtividade_media or 0), 2),
+        }
         for r in por_login_rows
     }
 

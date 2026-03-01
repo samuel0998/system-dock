@@ -106,6 +106,8 @@ def listar_cargas():
                 "units": int(c.units or 0),
                 "cartons": int(c.cartons or 0),
                 "aa_responsavel": c.aa_responsavel,
+                "start_time": c.start_time.isoformat() if c.start_time else None,
+                "tempo_total_segundos": int(c.tempo_total_segundos) if c.tempo_total_segundos is not None else None,
 
                 # ✅ tempo do SLA (front decide se mostra vermelho quando negativo)
                 "tempo_sla_segundos": tempo_sla_segundos,

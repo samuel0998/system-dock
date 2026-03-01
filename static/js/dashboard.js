@@ -225,13 +225,13 @@ graficoNoShow = new Chart(
     // =========================
 
     const logins = Object.keys(data.por_login || {});
-    const unitsLogin = logins.map(l => data.por_login[l]?.units || 0);
+    const produtividadeLogin = logins.map(l => data.por_login[l]?.produtividade_media || 0);
     const notasLogin = logins.map(l => data.por_login[l]?.notas || 0);
     if (graficoLogin) graficoLogin.destroy();
 
     graficoLogin = new Chart(
         document.getElementById("graficoPorLogin"),
-        configPadrao(logins, unitsLogin, "#6366f1")
+        configPadrao(logins, produtividadeLogin, "Produtividade (units/h)", "#6366f1")
     );
     // =========================
 // 🟣 CARGAS POR AA
