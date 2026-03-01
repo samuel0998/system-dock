@@ -1,9 +1,9 @@
 from flask import Blueprint, render_template, jsonify, request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import func
 
 from db import db
-from models import Carga
+from models import Carga, Transferencia
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -31,7 +31,12 @@ def dashboard_stats():
             "notas_por_dia": {},
             "notas_deletadas_por_dia": {},
             "no_show_por_dia": {},
-            "por_login": {}
+            "por_login": {},
+            "total_cargas_atrasadas": 0,
+            "produtividade_por_aa": {},
+            "cargas_atrasadas": [],
+            "transferencias_late_stow": [],
+            "total_transferencias_late_stow": 0,
         })
 
     # intervalo UTC (00:00:00 até 23:59:59)
@@ -41,6 +46,32 @@ def dashboard_stats():
     fim = datetime.fromisoformat(data_fim).replace(
         hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc
     )
+
+    agora = datetime.now(timezone.utc)
+
+    def _to_aware_utc(dt):
+        if not dt:
+            return None
+        if getattr(dt, "tzinfo", None) is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    def _deadline_sla(c):
+        # Regra unificada: ARRIVAL e ARRIVAL_SCHEDULED usam +4h do expected.
+        expected = _to_aware_utc(c.expected_arrival_date)
+        if expected:
+            return expected + timedelta(hours=4)
+
+        # fallback para legados sem expected
+        if c.status == "arrival":
+            base = _to_aware_utc(c.sla_setar_aa_deadline)
+            if base:
+                return base
+            arrived = _to_aware_utc(c.arrived_at)
+            if arrived:
+                return arrived + timedelta(hours=4)
+
+        return None
 
     # ==========================
     # CLOSED (fechadas) por end_time
@@ -105,7 +136,9 @@ def dashboard_stats():
         db.session.query(
             Carga.aa_responsavel,
             func.coalesce(func.sum(Carga.units), 0).label("units"),
-            func.count(Carga.id).label("notas")
+            func.count(Carga.id).label("notas"),
+            (func.coalesce(func.sum(Carga.tempo_total_segundos), 0) / 3600.0).label("horas_produzidas"),
+            func.coalesce(func.avg(Carga.units_por_hora), 0).label("produtividade_media")
         )
         .filter(
             Carga.status == "closed",
@@ -119,7 +152,12 @@ def dashboard_stats():
         .all()
     )
     por_login = {
-        r.aa_responsavel: {"units": int(r.units), "notas": int(r.notas)}
+        r.aa_responsavel: {
+            "units": int(r.units),
+            "notas": int(r.notas),
+            "horas_produzidas": round(float(r.horas_produzidas or 0), 2),
+            "produtividade_media": round(float(r.produtividade_media or 0), 2),
+        }
         for r in por_login_rows
     }
 
@@ -219,6 +257,81 @@ def dashboard_stats():
         .scalar()
     ) or 0
 
+    # Métrica histórica: carga que ofendeu permanece registrada para sempre.
+    cargas_sla = (
+        Carga.query
+        .filter(Carga.expected_arrival_date.isnot(None))
+        .order_by(Carga.expected_arrival_date.asc())
+        .all()
+    )
+
+    cargas_atrasadas = []
+    for c in cargas_sla:
+        deadline = _deadline_sla(c)
+        if not deadline:
+            continue
+
+        ofendeu_agora = agora > deadline
+        ofendeu_historico = bool(c.atraso_registrado)
+
+        if not ofendeu_agora and not ofendeu_historico:
+            continue
+
+        if ofendeu_agora:
+            atraso = int((agora - deadline).total_seconds())
+        else:
+            atraso = int(c.atraso_segundos or 0)
+
+        expected_utc = _to_aware_utc(c.expected_arrival_date)
+        cargas_atrasadas.append({
+            "appointment_id": c.appointment_id,
+            "status": c.status,
+            "expected_arrival_date": expected_utc.isoformat() if expected_utc else None,
+            "tempo_atraso_segundos": atraso,
+            "units": int(c.units or 0),
+            "cartons": int(c.cartons or 0),
+            "aa_responsavel": c.aa_responsavel,
+            "atraso_comentario": c.atraso_comentario,
+        })
+
+    transferencias_rows = (
+        Transferencia.query
+        .filter(
+            Transferencia.expected_arrival_date.isnot(None),
+            Transferencia.expected_arrival_date >= inicio,
+            Transferencia.expected_arrival_date <= fim,
+        )
+        .order_by(Transferencia.expected_arrival_date.asc())
+        .all()
+    )
+
+    transferencias_late = []
+    for t in transferencias_rows:
+        deadline = _to_aware_utc(t.late_stow_deadline)
+        if not deadline:
+            continue
+
+        estourada_agora = (not t.finalizada) and (agora > deadline)
+        estourada_historica = bool(t.prazo_estourado)
+
+        if not estourada_agora and not estourada_historica:
+            continue
+
+        if estourada_agora:
+            atraso_seg = int((agora - deadline).total_seconds())
+        else:
+            atraso_seg = int(t.prazo_estourado_segundos or 0)
+
+        transferencias_late.append({
+            "appointment_id": t.appointment_id,
+            "vrid": t.vrid,
+            "origem": t.origem,
+            "expected_arrival_date": _to_aware_utc(t.expected_arrival_date).isoformat() if t.expected_arrival_date else None,
+            "late_stow_deadline": deadline.isoformat(),
+            "status": "finalizada" if t.finalizada else "em_aberto",
+            "tempo_atraso_segundos": atraso_seg,
+        })
+
     return jsonify({
         "total_units": int(total_units),
         "total_units_no_show": int(total_units_no_show),
@@ -231,5 +344,10 @@ def dashboard_stats():
         "notas_por_dia": notas_por_dia,
         "notas_deletadas_por_dia": notas_deletadas_por_dia,
         "no_show_por_dia": no_show_por_dia,
-        "por_login": por_login
+        "por_login": por_login,
+        "produtividade_por_aa": por_login,
+        "total_cargas_atrasadas": len(cargas_atrasadas),
+        "cargas_atrasadas": cargas_atrasadas[:50],
+        "total_transferencias_late_stow": len(transferencias_late),
+        "transferencias_late_stow": transferencias_late[:100],
     })

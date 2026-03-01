@@ -31,6 +31,16 @@ class Carga(db.Model):
     tempo_total_segundos = db.Column(db.Integer, nullable=True)
     units_por_hora = db.Column(db.Float, nullable=True)
 
+    # ARRIVAL SLA
+    arrived_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    sla_setar_aa_deadline = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    # Atraso persistente
+    atraso_registrado = db.Column(db.Boolean, default=False, nullable=False)
+    atraso_segundos = db.Column(db.Integer, default=0, nullable=False)
+    atraso_comentario = db.Column(db.Text, nullable=True)
+    atraso_comentado_em = db.Column(db.DateTime(timezone=True), nullable=True)
+
     delete_reason = db.Column(db.Text, nullable=True)
     deleted_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
@@ -48,3 +58,29 @@ class Operador(db.Model):
 
     falta = db.Column(db.Boolean, default=False)
     emprestado = db.Column(db.Boolean, default=False)
+
+
+class Transferencia(db.Model):
+    __tablename__ = "transferencias"
+
+    id = db.Column(db.Integer, primary_key=True)
+    appointment_id = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    carga_id = db.Column(db.Integer, nullable=True, index=True)
+
+    expected_arrival_date = db.Column(db.DateTime(timezone=True), nullable=True, index=True)
+    status_carga = db.Column(db.String(30), nullable=True)
+    units = db.Column(db.Integer, default=0)
+    cartons = db.Column(db.Integer, default=0)
+
+    vrid = db.Column(db.String(80), nullable=True)
+    late_stow_deadline = db.Column(db.DateTime(timezone=True), nullable=True, index=True)
+    origem = db.Column(db.String(10), nullable=True, index=True)
+
+    info_preenchida = db.Column(db.Boolean, default=False, nullable=False)
+    finalizada = db.Column(db.Boolean, default=False, nullable=False)
+    finished_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    prazo_estourado = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    prazo_estourado_segundos = db.Column(db.Integer, default=0, nullable=False)
+
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
