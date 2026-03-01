@@ -4,12 +4,19 @@
 
 <div class="container">
 
-    <h2 class="titulo-pagina">Painel de Controle</h2>
+    <div class="painel-header">
+        <h2 class="titulo-pagina">Painel de Controle</h2>
+        <p class="painel-subtitulo">Acompanhe cargas em tempo real, filtre rapidamente e execute ações operacionais.</p>
+    </div>
 
     <!-- ========================= -->
     <!-- 🔎 FILTROS -->
     <!-- ========================= -->
-    <div class="filtro-container">
+    <div class="filtro-container filtro-container-moderno">
+        <div class="filtro-header">
+            <h3>Filtros Inteligentes</h3>
+            <span>Você pode combinar status, data e Appointment ID</span>
+        </div>
 
         <div class="filtro-grupo">
             <label>Data Inicial</label>
@@ -34,24 +41,20 @@
 
         <div class="filtro-grupo">
             <label>Buscar Appointment ID</label>
-            <input type="text" id="filtroAppointment" placeholder="Digite o ID">
+            <input type="text" id="filtroAppointment" placeholder="Ex.: 92003056969">
         </div>
 
         <div class="filtro-botoes">
-            <button onclick="aplicarFiltros()" class="btn-filtrar">Filtrar</button>
-            <button onclick="limparFiltros()" class="btn-limpar">Limpar</button>
+            <button onclick="aplicarFiltros()" class="btn-filtrar">Aplicar Filtros</button>
+            <button onclick="limparFiltros()" class="btn-limpar">Limpar Tudo</button>
         </div>
     </div>
-
-
-
-</div>
 
 
     <!-- ========================= -->
     <!-- 📋 TABELA -->
     <!-- ========================= -->
-    <div class="tabela-container">
+    <div class="tabela-container tabela-container-moderna">
 
         <table class="tabela-cargas">
 

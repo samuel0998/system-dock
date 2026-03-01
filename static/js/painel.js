@@ -74,7 +74,7 @@ function renderizarTabela(cargas) {
         }
 
         tr.innerHTML = `
-            <td>${carga.appointment_id ?? "-"}</td>
+            <td>${renderAppointmentLink(carga.appointment_id)}</td>
             <td>${carga.truck_tipo ?? "-"}</td>
             <td>${formatarData(carga.expected_arrival_date)}</td>
             <td>${Number(carga.units ?? 0)}</td>
@@ -383,6 +383,14 @@ function formatarData(data) {
     if (!data) return "-";
     const d = new Date(data);
     return isNaN(d) ? "-" : d.toLocaleString("pt-BR");
+}
+
+function renderAppointmentLink(appointmentId) {
+    const id = (appointmentId ?? "").toString().trim();
+    if (!id) return "-";
+
+    const href = `https://dockmaster.na.aftx.amazonoperations.app/pt_BR/#/dockmaster/appointment/GIG2/view/${encodeURIComponent(id)}/appointmentDetail`;
+    return `<a class="appointment-link" href="${href}" target="_blank" rel="noopener noreferrer">${id}</a>`;
 }
 
 // =====================================================
