@@ -414,7 +414,37 @@ function confirmarDelete() {
 function formatarData(data) {
     if (!data) return "-";
     const d = new Date(data);
-    return isNaN(d) ? "-" : d.toLocaleString("pt-BR");
+    if (isNaN(d)) return "-";
+
+    return d.toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        hour12: false
+    });
+}
+
+function renderAppointmentLink(appointmentId) {
+    const id = (appointmentId ?? "").toString().trim();
+    if (!id) return "-";
+
+    const href = `https://dockmaster.na.aftx.amazonoperations.app/pt_BR/#/dockmaster/appointment/GIG2/view/${encodeURIComponent(id)}/appointmentDetail`;
+    return `<a class="appointment-link" href="${href}" target="_blank" rel="noopener noreferrer">${id}</a>`;
+}
+
+function dataParaComparacao(data) {
+    // Converte para YYYY-MM-DD no fuso da operação (BRT)
+    const partes = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Sao_Paulo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).formatToParts(data);
+
+    const y = partes.find(p => p.type === "year")?.value;
+    const m = partes.find(p => p.type === "month")?.value;
+    const d = partes.find(p => p.type === "day")?.value;
+
+    if (!y || !m || !d) return "";
+    return `${y}-${m}-${d}`;
 }
 
 function renderAppointmentLink(appointmentId) {
@@ -466,7 +496,7 @@ function aplicarFiltros() {
             const dataCarga = new Date(carga.expected_arrival_date);
             if (isNaN(dataCarga)) return false;
 
-            const dataString = dataCarga.toISOString().split("T")[0];
+            const dataString = dataParaComparacao(dataCarga);
             if (dataInicio && dataString < dataInicio) return false;
             if (dataFim && dataString > dataFim) return false;
         }
