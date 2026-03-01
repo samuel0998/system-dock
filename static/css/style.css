@@ -802,6 +802,13 @@ body.dark-mode .tabela-cargas-atrasadas td {
     background: #eef2ff;
 }
 
+/* Garantir destaque vermelho em atraso (maior especificidade que zebra/hover) */
+.tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada td,
+.tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:nth-child(even) td,
+.tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:hover td {
+    background: #ffe5e5;
+}
+
 .appointment-link {
     color: #1d4ed8;
     font-weight: 700;
@@ -847,6 +854,12 @@ body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr:nth-child(even)
 
 body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr:hover td {
     background: #253046;
+}
+
+body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada td,
+body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:nth-child(even) td,
+body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:hover td {
+    background: #5b1d1d;
 }
 
 body.dark-mode .appointment-link {
