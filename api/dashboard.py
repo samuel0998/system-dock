@@ -55,19 +55,19 @@ def dashboard_stats():
         return dt.astimezone(timezone.utc)
 
     def _deadline_sla(c):
+        # Regra unificada: ARRIVAL e ARRIVAL_SCHEDULED usam +4h do expected.
+        expected = _to_aware_utc(c.expected_arrival_date)
+        if expected:
+            return expected + timedelta(hours=4)
+
+        # fallback para legados sem expected
         if c.status == "arrival":
             base = _to_aware_utc(c.sla_setar_aa_deadline)
             if base:
                 return base
             arrived = _to_aware_utc(c.arrived_at)
             if arrived:
-                return arrived.replace(tzinfo=timezone.utc) + timedelta(hours=4)
-            return None
-
-        if c.status == "arrival_scheduled":
-            expected = _to_aware_utc(c.expected_arrival_date)
-            if expected and agora > expected:
-                return expected + timedelta(hours=4)
+                return arrived + timedelta(hours=4)
 
         return None
 
@@ -255,14 +255,10 @@ def dashboard_stats():
         .scalar()
     ) or 0
 
+    # Métrica histórica: carga que ofendeu permanece registrada para sempre.
     cargas_sla = (
         Carga.query
-        .filter(
-            Carga.status.in_(["arrival", "arrival_scheduled"]),
-            Carga.expected_arrival_date.isnot(None),
-            Carga.expected_arrival_date >= inicio,
-            Carga.expected_arrival_date <= fim,
-        )
+        .filter(Carga.expected_arrival_date.isnot(None))
         .order_by(Carga.expected_arrival_date.asc())
         .all()
     )
@@ -270,14 +266,25 @@ def dashboard_stats():
     cargas_atrasadas = []
     for c in cargas_sla:
         deadline = _deadline_sla(c)
-        if not deadline or agora <= deadline:
+        if not deadline:
             continue
 
-        atraso = int((agora - deadline).total_seconds())
+        ofendeu_agora = agora > deadline
+        ofendeu_historico = bool(c.atraso_registrado)
+
+        if not ofendeu_agora and not ofendeu_historico:
+            continue
+
+        if ofendeu_agora:
+            atraso = int((agora - deadline).total_seconds())
+        else:
+            atraso = int(c.atraso_segundos or 0)
+
+        expected_utc = _to_aware_utc(c.expected_arrival_date)
         cargas_atrasadas.append({
             "appointment_id": c.appointment_id,
             "status": c.status,
-            "expected_arrival_date": c.expected_arrival_date.isoformat() if c.expected_arrival_date else None,
+            "expected_arrival_date": expected_utc.isoformat() if expected_utc else None,
             "tempo_atraso_segundos": atraso,
             "units": int(c.units or 0),
             "cartons": int(c.cartons or 0),

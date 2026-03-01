@@ -22,6 +22,23 @@ def _to_aware_utc(dt: datetime | None) -> datetime | None:
     return dt.astimezone(timezone.utc) if isinstance(dt, datetime) else None
 
 
+def _deadline_sla_por_expected(carga: Carga) -> datetime | None:
+    """
+    Regra operacional: a ofensa sempre é 4h após Expected Arrival Date,
+    inclusive quando a carga já avançou de ARRIVAL_SCHEDULED para ARRIVAL.
+    """
+    expected = _to_aware_utc(carga.expected_arrival_date)
+    if expected:
+        return expected + timedelta(hours=4)
+
+    # fallback defensivo para registros legados sem expected
+    arrived = _to_aware_utc(carga.arrived_at)
+    if arrived:
+        return arrived + timedelta(hours=4)
+
+    return None
+
+
 # =====================================================
 # Pages
 # =====================================================
@@ -60,27 +77,10 @@ def listar_cargas():
 
             tempo_sla_segundos = None
 
-            # ✅ Nova regra de contagem:
-            # - ARRIVAL: mantém deadline de 4h a partir de "carga chegou"
-            # - ARRIVAL_SCHEDULED: após passar do expected, inicia contagem de 4h
+            # ✅ Regra de SLA única:
+            # ARRIVAL e ARRIVAL_SCHEDULED ofendem em +4h do Expected Arrival Date.
             if c.status in ("arrival", "arrival_scheduled"):
-                deadline = None
-
-                if c.status == "arrival":
-                    if c.sla_setar_aa_deadline is None:
-                        # fallback defensivo caso algum registro antigo esteja sem deadline
-                        base = c.arrived_at or agora
-                        c.arrived_at = c.arrived_at or base
-                        c.sla_setar_aa_deadline = base + timedelta(hours=4)
-                        mudou_algo = True
-
-                    deadline = c.sla_setar_aa_deadline
-
-                elif c.status == "arrival_scheduled" and expected and agora > expected:
-                    deadline = expected + timedelta(hours=4)
-
-                if deadline and deadline.tzinfo is None:
-                    deadline = deadline.replace(tzinfo=timezone.utc)
+                deadline = _deadline_sla_por_expected(c)
 
                 if deadline:
                     tempo_sla_segundos = int((deadline - agora).total_seconds())
@@ -174,6 +174,14 @@ def finalizar(carga_id):
     carga.end_time = end_time
     carga.tempo_total_segundos = tempo_total_segundos
     carga.units_por_hora = units_por_hora
+
+    # Persistência da métrica: se ofendeu no fechamento, fica registrada para sempre.
+    deadline = _deadline_sla_por_expected(carga)
+    if deadline and end_time > deadline:
+        atraso_atual = int((end_time - deadline).total_seconds())
+        if (not carga.atraso_registrado) or (atraso_atual > int(carga.atraso_segundos or 0)):
+            carga.atraso_registrado = True
+            carga.atraso_segundos = atraso_atual
 
     db.session.commit()
     return jsonify({"message": "Carga finalizada"})
