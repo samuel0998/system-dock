@@ -852,3 +852,53 @@ body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr:hover td {
 body.dark-mode .appointment-link {
     color: #93c5fd;
 }
+
+.btn-comentario-atraso {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    margin-right: 6px;
+    font-size: 12px;
+}
+
+.btn-comentario-atraso:hover {
+    background: #1d4ed8;
+}
+
+.input-filtro-dashboard {
+    margin-left: auto;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    min-width: 220px;
+}
+
+.btn-balao {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.dashboard-lista-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+body.dark-mode .input-filtro-dashboard {
+    background: #111827;
+    color: #e5e7eb;
+    border-color: #374151;
+}
+
+body.dark-mode .btn-balao {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}

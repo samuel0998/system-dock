@@ -117,6 +117,7 @@ def listar_cargas():
                 # ✅ atraso persistido
                 "atraso_segundos": int(c.atraso_segundos or 0),
                 "atraso_registrado": bool(c.atraso_registrado),
+                "atraso_comentario": c.atraso_comentario,
 
                 "priority_score": float(c.priority_score or 0),
             })
@@ -231,6 +232,28 @@ def carga_chegou(carga_id):
     except Exception:
         current_app.logger.exception("Erro em /pc/carga-chegou")
         return jsonify({"message": "Erro interno."}), 500
+
+
+@painel_bp.route("/comentar-atraso/<int:carga_id>", methods=["POST"])
+def comentar_atraso(carga_id):
+    data = request.get_json(silent=True) or {}
+    comentario = (data.get("comentario") or "").strip()
+
+    if not comentario:
+        return jsonify({"error": "Comentário é obrigatório"}), 400
+
+    carga = Carga.query.get(carga_id)
+    if not carga:
+        return jsonify({"error": "Carga não encontrada"}), 404
+
+    if carga.status not in ("arrival", "arrival_scheduled"):
+        return jsonify({"error": "Comentário só pode ser registrado para cargas em ARRIVAL/ARRIVAL_SCHEDULED"}), 400
+
+    carga.atraso_comentario = comentario
+    carga.atraso_comentado_em = datetime.now(timezone.utc)
+
+    db.session.commit()
+    return jsonify({"message": "Comentário de atraso salvo"}), 200
 
 
 # =====================================================

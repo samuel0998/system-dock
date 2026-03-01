@@ -80,6 +80,7 @@
         <div class="dashboard-lista-header">
             <h4>Lista de Cargas em Atraso</h4>
             <small>Somente cargas com SLA de +4h ultrapassado</small>
+            <input type="text" id="filtroAtrasoAppointment" placeholder="Filtrar Appointment ID" class="input-filtro-dashboard">
         </div>
         <div class="dashboard-lista-wrap">
             <table class="tabela-cargas-atrasadas">
@@ -92,9 +93,32 @@
                         <th>Units</th>
                         <th>Cartons</th>
                         <th>AA</th>
+                        <th>Comentário</th>
                     </tr>
                 </thead>
                 <tbody id="listaCargasAtrasadas"></tbody>
+            </table>
+        </div>
+    </div>
+
+
+    <div class="dashboard-lista-atraso">
+        <div class="dashboard-lista-header">
+            <h4>Produtividade por AA</h4>
+            <small>Units, horas produzidas e rate (units/h)</small>
+            <input type="text" id="filtroProdLogin" placeholder="Filtrar login" class="input-filtro-dashboard">
+        </div>
+        <div class="dashboard-lista-wrap">
+            <table class="tabela-cargas-atrasadas">
+                <thead>
+                    <tr>
+                        <th>Login</th>
+                        <th>Units</th>
+                        <th>Horas Produzidas</th>
+                        <th>Rate (units/h)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaProdutividadeAA"></tbody>
             </table>
         </div>
     </div>

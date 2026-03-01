@@ -8,6 +8,7 @@
 // - truck_tipo (string | null)
 
 document.addEventListener("DOMContentLoaded", () => {
+    setarFiltrosDataHoje();
     carregarCargas();
 
     // Se seus botões de filtro chamam via onclick no HTML, ok.
@@ -33,7 +34,7 @@ function carregarCargas() {
                 return;
             }
             cargasGlobais = data;
-            renderizarTabela(data);
+            aplicarFiltros();
         })
         .catch(err => {
             console.error("Erro ao carregar cargas:", err);
@@ -91,6 +92,7 @@ function renderizarTabela(cargas) {
                 ${formatarTempoFinal(carga)}
             </td>
             <td>${renderizarBotaoAcao(carga)}</td>
+            <td>${renderizarComentarioAtraso(carga)}</td>
         `;
 
         tabela.appendChild(tr);
@@ -108,6 +110,25 @@ function renderizarTabela(cargas) {
             iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
         }
     });
+}
+
+function isCargaAtrasada(carga) {
+    return (
+        (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
+        typeof carga.tempo_sla_segundos === "number" &&
+        carga.tempo_sla_segundos < 0
+    );
+}
+
+function renderizarComentarioAtraso(carga) {
+    if (!isCargaAtrasada(carga)) return "-";
+
+    const textoBotao = carga.atraso_comentario ? "Editar comentário" : "Comentar atraso";
+    const balao = carga.atraso_comentario
+        ? `<button class="btn-comentario-atraso" title="${escapeHtml(carga.atraso_comentario)}" onclick="mostrarComentarioExistente('${carga.id}')">💬</button>`
+        : "";
+
+    return `${balao}<button class="btn-comentario-atraso" onclick="abrirModalAtraso('${carga.id}')">${textoBotao}</button>`;
 }
 
 // =====================================================
@@ -410,6 +431,61 @@ function confirmarDelete() {
         });
 }
 
+let cargaAtrasoSelecionada = null;
+
+function abrirModalAtraso(cargaId) {
+    cargaAtrasoSelecionada = cargaId;
+
+    const modal = document.getElementById("modalAtraso");
+    const textarea = document.getElementById("comentarioAtraso");
+    const carga = cargasGlobais.find(c => String(c.id) === String(cargaId));
+
+    if (!modal || !textarea) return;
+
+    textarea.value = carga?.atraso_comentario || "";
+    modal.style.display = "flex";
+}
+
+function fecharModalAtraso() {
+    cargaAtrasoSelecionada = null;
+    const modal = document.getElementById("modalAtraso");
+    if (modal) modal.style.display = "none";
+}
+
+function mostrarComentarioExistente(cargaId) {
+    const carga = cargasGlobais.find(c => String(c.id) === String(cargaId));
+    alert(carga?.atraso_comentario || "Sem comentário registrado.");
+}
+
+function confirmarComentarioAtraso() {
+    const textarea = document.getElementById("comentarioAtraso");
+    const comentario = (textarea?.value || "").trim();
+
+    if (!comentario) {
+        alert("Digite o comentário do atraso.");
+        return;
+    }
+
+    fetch(`/pc/comentar-atraso/${cargaAtrasoSelecionada}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comentario })
+    })
+        .then(res => res.json())
+        .then(resp => {
+            if (resp?.error) {
+                alert(resp.error);
+                return;
+            }
+            fecharModalAtraso();
+            carregarCargas();
+        })
+        .catch(err => {
+            console.error("Erro ao salvar comentário:", err);
+            alert("Erro ao salvar comentário de atraso.");
+        });
+}
+
 // =====================================================
 // 📅 FORMATAR DATA
 // =====================================================
@@ -422,6 +498,15 @@ function confirmarDelete() {
         timeZone: "America/Sao_Paulo",
         hour12: false
     });
+}
+
+function escapeHtml(texto) {
+    return String(texto ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#039;");
 }
 
 function renderAppointmentLink(appointmentId) {
@@ -513,15 +598,28 @@ function limparFiltros() {
     const appointment = document.getElementById("filtroAppointment");
     const select = document.getElementById("filtroStatus");
 
-    if (dataInicio) dataInicio.value = "";
-    if (dataFim) dataFim.value = "";
+    setarFiltrosDataHoje();
     if (appointment) appointment.value = "";
 
     if (select) {
         Array.from(select.options).forEach(option => option.selected = false);
     }
 
-    renderizarTabela(cargasGlobais);
+    aplicarFiltros();
+}
+
+function setarFiltrosDataHoje() {
+    const hoje = new Date();
+    const y = hoje.getFullYear();
+    const m = String(hoje.getMonth() + 1).padStart(2, "0");
+    const d = String(hoje.getDate()).padStart(2, "0");
+    const valor = `${y}-${m}-${d}`;
+
+    const dataInicio = document.getElementById("filtroDataInicio");
+    const dataFim = document.getElementById("filtroDataFim");
+
+    if (dataInicio) dataInicio.value = valor;
+    if (dataFim) dataFim.value = valor;
 }
 
 // =====================================================

@@ -33,6 +33,7 @@ def dashboard_stats():
             "no_show_por_dia": {},
             "por_login": {},
             "total_cargas_atrasadas": 0,
+            "produtividade_por_aa": {},
             "cargas_atrasadas": []
         })
 
@@ -134,6 +135,7 @@ def dashboard_stats():
             Carga.aa_responsavel,
             func.coalesce(func.sum(Carga.units), 0).label("units"),
             func.count(Carga.id).label("notas"),
+            (func.coalesce(func.sum(Carga.tempo_total_segundos), 0) / 3600.0).label("horas_produzidas"),
             func.coalesce(func.avg(Carga.units_por_hora), 0).label("produtividade_media")
         )
         .filter(
@@ -151,6 +153,7 @@ def dashboard_stats():
         r.aa_responsavel: {
             "units": int(r.units),
             "notas": int(r.notas),
+            "horas_produzidas": round(float(r.horas_produzidas or 0), 2),
             "produtividade_media": round(float(r.produtividade_media or 0), 2),
         }
         for r in por_login_rows
@@ -279,6 +282,7 @@ def dashboard_stats():
             "units": int(c.units or 0),
             "cartons": int(c.cartons or 0),
             "aa_responsavel": c.aa_responsavel,
+            "atraso_comentario": c.atraso_comentario,
         })
 
     return jsonify({
@@ -294,6 +298,7 @@ def dashboard_stats():
         "notas_deletadas_por_dia": notas_deletadas_por_dia,
         "no_show_por_dia": no_show_por_dia,
         "por_login": por_login,
+        "produtividade_por_aa": por_login,
         "total_cargas_atrasadas": len(cargas_atrasadas),
         "cargas_atrasadas": cargas_atrasadas[:50]
     })

@@ -70,7 +70,7 @@
                     <th>Priority</th>
                     <th>Tempo</th>
                     <th>Ação</th>
-                    
+                    <th>Comentário Atraso</th>
                 </tr>
             </thead>
 
@@ -125,6 +125,30 @@
             </button>
 
             <button onclick="fecharModalAA()" class="btn-cancel">
+                Cancelar
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========================= -->
+<!-- 💬 MODAL COMENTAR ATRASO -->
+<!-- ========================= -->
+<div id="modalAtraso" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h3>Comentar Atraso</h3>
+
+        <textarea id="comentarioAtraso"
+                  placeholder="Descreva o motivo do atraso..."
+                  rows="4"></textarea>
+
+        <div class="modal-actions">
+            <button onclick="confirmarComentarioAtraso()" class="btn-confirm">
+                Salvar
+            </button>
+
+            <button onclick="fecharModalAtraso()" class="btn-cancel">
                 Cancelar
             </button>
         </div>

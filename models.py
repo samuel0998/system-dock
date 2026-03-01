@@ -38,6 +38,8 @@ class Carga(db.Model):
     # Atraso persistente
     atraso_registrado = db.Column(db.Boolean, default=False, nullable=False)
     atraso_segundos = db.Column(db.Integer, default=0, nullable=False)
+    atraso_comentario = db.Column(db.Text, nullable=True)
+    atraso_comentado_em = db.Column(db.DateTime(timezone=True), nullable=True)
 
     delete_reason = db.Column(db.Text, nullable=True)
     deleted_at = db.Column(db.DateTime(timezone=True), nullable=True)
