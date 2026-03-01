@@ -167,6 +167,7 @@ def listar_transferencias():
             "prazo_estourado": bool(t.prazo_estourado),
             "prazo_estourado_segundos": int(t.prazo_estourado_segundos or 0),
             "tempo_prazo_segundos": tempo_prazo_segundos,
+            "comentario_late_stow": t.comentario_late_stow,
         })
 
     if mudou or mudou_sync:
@@ -242,3 +243,26 @@ def finalizar_transferencia(transfer_id):
 
     db.session.commit()
     return jsonify({"message": "Transferência finalizada"})
+
+
+@transferin_bp.route("/comentar/<int:transfer_id>", methods=["POST"])
+def comentar_transferencia(transfer_id):
+    t = Transferencia.query.get(transfer_id)
+    if not t:
+        return jsonify({"error": "Transferência não encontrada"}), 404
+
+    data = request.get_json(silent=True) or {}
+    comentario = (data.get("comentario") or "").strip()
+
+    if not comentario:
+        return jsonify({"error": "Comentário é obrigatório"}), 400
+
+    # Só registra comentário para carga vencida (ou que venceu e já finalizou)
+    _atualizar_estado_prazo(t, datetime.now(timezone.utc))
+    if not t.prazo_estourado:
+        return jsonify({"error": "Comentário permitido apenas para transferência vencida"}), 400
+
+    t.comentario_late_stow = comentario
+    t.comentario_late_stow_em = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify({"message": "Comentário salvo"}), 200

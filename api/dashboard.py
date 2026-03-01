@@ -330,6 +330,7 @@ def dashboard_stats():
             "late_stow_deadline": deadline.isoformat(),
             "status": "finalizada" if t.finalizada else "em_aberto",
             "tempo_atraso_segundos": atraso_seg,
+            "comentario_late_stow": t.comentario_late_stow,
         })
 
     return jsonify({

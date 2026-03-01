@@ -147,11 +147,15 @@ function renderizarTabelaTransferLate(rows) {
     tbody.innerHTML = "";
 
     if (!Array.isArray(rows) || rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="linha-sem-dados">Nenhuma transferência com Late Stow no período.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="linha-sem-dados">Nenhuma transferência com Late Stow no período.</td></tr>`;
         return;
     }
 
     rows.forEach(t => {
+        const comentario = t.comentario_late_stow
+            ? `<button class="btn-balao" title="${escapeHtml(t.comentario_late_stow)}" onclick="alert('${escapeJs(t.comentario_late_stow)}')">💬</button>`
+            : "-";
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${renderAppointmentLink(t.appointment_id)}</td>
@@ -160,6 +164,7 @@ function renderizarTabelaTransferLate(rows) {
             <td>${formatarDataHora(t.expected_arrival_date)}</td>
             <td>${formatarDataHora(t.late_stow_deadline)}</td>
             <td class="atraso-cell">${formatarTempoAtraso(t.tempo_atraso_segundos)}</td>
+            <td>${comentario}</td>
             <td>${(t.status || "-").toUpperCase()}</td>
         `;
         tbody.appendChild(tr);

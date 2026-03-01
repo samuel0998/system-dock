@@ -94,6 +94,8 @@ def run():
 
       prazo_estourado BOOLEAN NOT NULL DEFAULT FALSE,
       prazo_estourado_segundos INTEGER NOT NULL DEFAULT 0,
+      comentario_late_stow TEXT NULL,
+      comentario_late_stow_em TIMESTAMP NULL,
 
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );

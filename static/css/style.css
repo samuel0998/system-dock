@@ -776,17 +776,6 @@ body.dark-mode .tabela-cargas-atrasadas td {
 
 /* =========================================
    PAINEL - VISUAL MODERNO
-========================================= */
-.painel-header {
-    margin-bottom: 18px;
-}
-
-.painel-subtitulo {
-    margin: 6px 0 0;
-    color: #64748b;
-    font-size: 14px;
-}
-
 .filtro-container-moderno {
     background: linear-gradient(160deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid #e2e8f0;
@@ -1047,6 +1036,63 @@ body.dark-mode .transfer-table tbody tr.transfer-finalizada td { background: #1e
     display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
+}
+
+.transfer-form-grid .filtro-grupo label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.transfer-form-grid input,
+.transfer-form-grid select {
+    height: 40px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+    padding: 0 12px;
+    font-size: 14px;
+}
+
+.transfer-form-grid input:focus,
+.transfer-form-grid select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.transfer-modal-actions {
+    margin-top: 18px;
+}
+
+.transfer-save-btn {
+    background: linear-gradient(120deg, #2563eb, #1d4ed8);
+}
+
+body.dark-mode .transfer-modal-content {
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+    border-color: #334155;
+}
+
+body.dark-mode .transfer-modal-header h3 {
+    color: #f8fafc;
+}
+
+body.dark-mode .transfer-pill {
+    color: #dbeafe;
+    background: #1e40af;
+    border-color: #1d4ed8;
+}
+
+body.dark-mode .transfer-form-grid .filtro-grupo label {
+    color: #cbd5e1;
+}
+
+body.dark-mode .transfer-form-grid input,
+body.dark-mode .transfer-form-grid select {
+    background: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
 }
 
 .transfer-form-grid .filtro-grupo label {

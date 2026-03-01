@@ -82,5 +82,7 @@ class Transferencia(db.Model):
 
     prazo_estourado = db.Column(db.Boolean, default=False, nullable=False, index=True)
     prazo_estourado_segundos = db.Column(db.Integer, default=0, nullable=False)
+    comentario_late_stow = db.Column(db.Text, nullable=True)
+    comentario_late_stow_em = db.Column(db.DateTime(timezone=True), nullable=True)
 
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

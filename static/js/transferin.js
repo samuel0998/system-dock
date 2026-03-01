@@ -1,6 +1,7 @@
 let transferenciaSelecionada = null;
 let transferenciaAppointmentSelecionada = "";
 let timersTransfer = {};
+let transferenciasCache = [];
 
 document.addEventListener("DOMContentLoaded", () => {
     carregarTransferencias();
@@ -26,13 +27,15 @@ function carregarTransferencias() {
 }
 
 function renderizarTransferencias(lista) {
+    transferenciasCache = Array.isArray(lista) ? lista : [];
+
     const tbody = document.getElementById("tabelaTransferencias");
     if (!tbody) return;
 
     tbody.innerHTML = "";
 
     if (!Array.isArray(lista) || lista.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" class="linha-sem-dados">Nenhuma transferência do dia encontrada.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="linha-sem-dados">Nenhuma transferência do dia encontrada.</td></tr>`;
         return;
     }
 
@@ -53,6 +56,7 @@ function renderizarTransferencias(lista) {
             <td>${formatarData(t.late_stow_deadline)}</td>
             <td id="timer-transfer-${t.id}">${formatarTempoPrazo(t.tempo_prazo_segundos, t.finalizada)}</td>
             <td><span class="badge-transfer badge-${statusCard}">${statusCard}</span></td>
+            <td>${renderComentarioLateStow(t)}</td>
             <td>
                 <button class="btn-acao" onclick="abrirModalTransfer('${t.id ?? ""}', '${escapeJs(t.appointment_id || "")}', '${escapeJs(t.vrid || "")}', '${(t.origem || "")}', '${toDatetimeLocal(t.late_stow_deadline)}')">✏️</button>
                 ${t.info_preenchida && !t.finalizada ? `<button class="btn-filtrar" onclick="finalizarTransfer('${t.id}')">Finalizar</button>` : ""}
@@ -65,6 +69,47 @@ function renderizarTransferencias(lista) {
             iniciarTimerPrazo(t.id, t.tempo_prazo_segundos);
         }
     });
+}
+
+function renderComentarioLateStow(t) {
+    if (!t.prazo_estourado) return "-";
+
+    const title = t.comentario_late_stow ? `title="${escapeHtml(t.comentario_late_stow)}"` : "title='Adicionar comentário'";
+    return `<button class="btn-balao" ${title} onclick="comentarTransferLate('${t.id}')">💬</button>`;
+}
+
+function comentarTransferLate(id) {
+    const atual = buscarTransfer(id)?.comentario_late_stow || "";
+    const comentario = prompt("Comentário da transferência vencida:", atual);
+    if (comentario === null) return;
+
+    const texto = comentario.trim();
+    if (!texto) {
+        alert("Comentário é obrigatório.");
+        return;
+    }
+
+    fetch(`/transferin/comentar/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comentario: texto })
+    })
+        .then(r => r.json())
+        .then(resp => {
+            if (resp?.error) {
+                alert(resp.error);
+                return;
+            }
+            carregarTransferencias();
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Erro ao salvar comentário.");
+        });
+}
+
+function buscarTransfer(id) {
+    return transferenciasCache.find(t => String(t.id) === String(id)) || null;
 }
 
 function obterStatusCard(t) {
@@ -220,4 +265,13 @@ function renderAppointmentLink(appointmentId) {
 
 function escapeJs(texto) {
     return String(texto ?? "").replaceAll("\\", "\\\\").replaceAll("'", "\\'").replaceAll("\n", "\\n");
+}
+
+function escapeHtml(texto) {
+    return String(texto ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#039;");
 }
