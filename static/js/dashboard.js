@@ -154,7 +154,9 @@ function atualizarDashboard(data) {
     animarNumero("totalNotasAndamento", data.total_notas_andamento ?? 0);
     animarNumero("totalNotasDeletadas", data.total_notas_deletadas ?? 0);
     animarNumero("totalNotasNoShow", data.total_notas_no_show ?? 0);
+    animarNumero("totalCargasAtrasadas", data.total_cargas_atrasadas ?? 0);
 
+    renderizarListaAtrasadas(data.cargas_atrasadas || []);
 
     // =========================
     // 🟡 UNIDADES
@@ -223,13 +225,13 @@ graficoNoShow = new Chart(
     // =========================
 
     const logins = Object.keys(data.por_login || {});
-    const unitsLogin = logins.map(l => data.por_login[l]?.units || 0);
+    const produtividadeLogin = logins.map(l => data.por_login[l]?.produtividade_media || 0);
     const notasLogin = logins.map(l => data.por_login[l]?.notas || 0);
     if (graficoLogin) graficoLogin.destroy();
 
     graficoLogin = new Chart(
         document.getElementById("graficoPorLogin"),
-        configPadrao(logins, unitsLogin, "#6366f1")
+        configPadrao(logins, produtividadeLogin, "Produtividade (units/h)", "#6366f1")
     );
     // =========================
 // 🟣 CARGAS POR AA
@@ -285,6 +287,52 @@ graficoNoShowDia = new Chart(
 
 }
 
+
+function renderizarListaAtrasadas(cargas) {
+    const tbody = document.getElementById("listaCargasAtrasadas");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    if (!Array.isArray(cargas) || cargas.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="linha-sem-dados">Nenhuma carga em atraso no intervalo selecionado.</td></tr>`;
+        return;
+    }
+
+    cargas.forEach(carga => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${carga.appointment_id ?? "-"}</td>
+            <td>${formatarStatus(carga.status)}</td>
+            <td>${formatarDataHora(carga.expected_arrival_date)}</td>
+            <td class="atraso-cell">${formatarTempoAtraso(carga.tempo_atraso_segundos)}</td>
+            <td>${Number(carga.units ?? 0)}</td>
+            <td>${Number(carga.cartons ?? 0)}</td>
+            <td>${carga.aa_responsavel ?? "-"}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function formatarTempoAtraso(segundos) {
+    const t = Math.max(0, Number(segundos || 0));
+    const horas = String(Math.floor(t / 3600)).padStart(2, "0");
+    const minutos = String(Math.floor((t % 3600) / 60)).padStart(2, "0");
+    const seg = String(t % 60).padStart(2, "0");
+    return `${horas}:${minutos}:${seg}`;
+}
+
+function formatarDataHora(valor) {
+    if (!valor) return "-";
+    const d = new Date(valor);
+    if (Number.isNaN(d.getTime())) return "-";
+    return d.toLocaleString("pt-BR");
+}
+
+function formatarStatus(status) {
+    if (!status) return "-";
+    return String(status).replaceAll("_", " ").toUpperCase();
+}
 
 // ======================================
 // ✨ ANIMAÇÃO SUAVE NOS NÚMEROS
