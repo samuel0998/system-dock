@@ -100,7 +100,7 @@ def listar_cargas():
                 "truck_type": getattr(c, "truck_type", None),
                 "truck_tipo": getattr(c, "truck_tipo", None),
 
-                "expected_arrival_date": c.expected_arrival_date.isoformat() if c.expected_arrival_date else None,
+                "expected_arrival_date": expected.isoformat() if expected else None,
                 "status": c.status,
 
                 "units": int(c.units or 0),

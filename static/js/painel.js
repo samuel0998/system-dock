@@ -411,7 +411,7 @@ function confirmarDelete() {
 // =====================================================
 // 📅 FORMATAR DATA
 // =====================================================
-function formatarData(data) {
+  function formatarData(data) {
     if (!data) return "-";
     const d = new Date(data);
     if (isNaN(d)) return "-";
@@ -445,14 +445,6 @@ function dataParaComparacao(data) {
 
     if (!y || !m || !d) return "";
     return `${y}-${m}-${d}`;
-}
-
-function renderAppointmentLink(appointmentId) {
-    const id = (appointmentId ?? "").toString().trim();
-    if (!id) return "-";
-
-    const href = `https://dockmaster.na.aftx.amazonoperations.app/pt_BR/#/dockmaster/appointment/GIG2/view/${encodeURIComponent(id)}/appointmentDetail`;
-    return `<a class="appointment-link" href="${href}" target="_blank" rel="noopener noreferrer">${id}</a>`;
 }
 
 // =====================================================
