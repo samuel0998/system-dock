@@ -2,7 +2,7 @@
 // Versão limpa (sem funções duplicadas) + suporte a ARRIVAL_SCHEDULED + SLA 4h em ARRIVAL
 // Requisitos do backend (/pc/listar):
 // - status: "arrival_scheduled" | "arrival" | "checkin" | "closed" | "no_show" | "deleted"
-// - tempo_sla_segundos (number | null) para status arrival
+// - tempo_sla_segundos (number | null) para status arrival e arrival_scheduled (quando aplicável)
 // - start_time (ISO | null) para status checkin
 // - tempo_total_segundos (number | null) para status closed
 // - truck_tipo (string | null)
@@ -64,9 +64,9 @@ function renderizarTabela(cargas) {
         const tr = document.createElement("tr");
         const prioridade = calcularPrioridade(Number(carga.priority_score ?? 0));
 
-        // Linha vermelha quando ARRIVAL e SLA negativo
+        // Linha vermelha quando SLA negativo (ARRIVAL ou ARRIVAL_SCHEDULED após expected)
         if (
-            carga.status === "arrival" &&
+            (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
             typeof carga.tempo_sla_segundos === "number" &&
             carga.tempo_sla_segundos < 0
         ) {
@@ -74,7 +74,7 @@ function renderizarTabela(cargas) {
         }
 
         tr.innerHTML = `
-            <td>${carga.appointment_id ?? "-"}</td>
+            <td>${renderAppointmentLink(carga.appointment_id)}</td>
             <td>${carga.truck_tipo ?? "-"}</td>
             <td>${formatarData(carga.expected_arrival_date)}</td>
             <td>${Number(carga.units ?? 0)}</td>
@@ -141,12 +141,12 @@ function formatarTempoFinal(carga) {
         return "00:00:00";
     }
 
-    // ARRIVAL -> SLA 4h vindo do backend (tempo_sla_segundos)
-    if (carga.status === "arrival") {
+    // ARRIVAL / ARRIVAL_SCHEDULED -> SLA vindo do backend (tempo_sla_segundos)
+    // Em ARRIVAL_SCHEDULED o backend só preenche após passar do expected.
+    if (carga.status === "arrival" || carga.status === "arrival_scheduled") {
         return formatarTempoSLA(carga.tempo_sla_segundos);
     }
 
-    // ARRIVAL_SCHEDULED -> sem SLA
     return "-";
 }
 
@@ -383,6 +383,14 @@ function formatarData(data) {
     if (!data) return "-";
     const d = new Date(data);
     return isNaN(d) ? "-" : d.toLocaleString("pt-BR");
+}
+
+function renderAppointmentLink(appointmentId) {
+    const id = (appointmentId ?? "").toString().trim();
+    if (!id) return "-";
+
+    const href = `https://dockmaster.na.aftx.amazonoperations.app/pt_BR/#/dockmaster/appointment/GIG2/view/${encodeURIComponent(id)}/appointmentDetail`;
+    return `<a class="appointment-link" href="${href}" target="_blank" rel="noopener noreferrer">${id}</a>`;
 }
 
 // =====================================================

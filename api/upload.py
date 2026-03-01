@@ -82,7 +82,7 @@ def _status_do_sistema(plan_status_raw: object) -> str | None:
     """
     LÓGICA DO SISTEMA (não copia status livremente)
     - ARRIVAL_SCHEDULED -> arrival_scheduled
-    - CLOSED -> None (ignora)
+    - CLOSED/DELETED -> None (ignora)
     - qualquer outro -> arrival
     """
     if plan_status_raw is None or (isinstance(plan_status_raw, float) and pd.isna(plan_status_raw)):
@@ -97,7 +97,7 @@ def _status_do_sistema(plan_status_raw: object) -> str | None:
 
     if s == "ARRIVAL_SCHEDULED":
         return "arrival_scheduled"
-    if s == "CLOSED":
+    if s in ("CLOSED", "DELETED"):
         return None
 
     return "arrival"
@@ -117,9 +117,12 @@ def processar_planilha():
     inseridas = 0
     atualizadas = 0
     ignoradas = 0
+    repetidas_no_arquivo = 0
     erros: list[str] = []
 
     agora = datetime.now(timezone.utc)
+
+    seen_appointments: set[str] = set()
 
     for idx, row in df.iterrows():
         try:
@@ -133,6 +136,11 @@ def processar_planilha():
             if not appointment_str:
                 ignoradas += 1
                 continue
+
+            if appointment_str in seen_appointments:
+                repetidas_no_arquivo += 1
+            else:
+                seen_appointments.add(appointment_str)
 
             type_raw = row.iloc[1] if len(row) > 1 else None
             truck_type, truck_tipo = _normalize_type(type_raw)
@@ -160,6 +168,11 @@ def processar_planilha():
             except Exception:
                 cartons_val = 0
 
+            # regra de negócio: cargas com units <= 0 são ignoradas
+            if units_val <= 0:
+                ignoradas += 1
+                continue
+
             # Priority score
             priority_score_raw = _get_col(row, "Priority Score", default=0) or 0
             try:
@@ -171,7 +184,7 @@ def processar_planilha():
             plan_status = _get_col(row, "Status", "STATUS", default=None)
             status = _status_do_sistema(plan_status)
 
-            # CLOSED -> ignorar
+            # CLOSED/DELETED -> ignorar
             if status is None:
                 ignoradas += 1
                 continue
@@ -253,5 +266,7 @@ def processar_planilha():
         "inseridas": inseridas,
         "atualizadas": atualizadas,
         "ignoradas": ignoradas,
+        "repetidas_no_arquivo": repetidas_no_arquivo,
+        "observacao": "Quando o mesmo Appointment ID aparece mais de uma vez, o sistema atualiza o registro já existente em vez de criar uma nova carga.",
         "erros": erros[:30],
     }), 200
