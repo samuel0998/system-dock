@@ -1,11 +1,17 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 import pandas as pd
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from db import db
 from models import Carga
 
 upload_bp = Blueprint("upload", __name__, url_prefix="/upload")
+
+try:
+    LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
+except Exception:
+    LOCAL_TZ = timezone(timedelta(hours=-3))
 
 
 @upload_bp.route("/")
@@ -61,19 +67,26 @@ def _to_utc_aware(dt):
     if dt is None or pd.isna(dt):
         return None
 
+    raw = str(dt).strip() if isinstance(dt, str) else None
+
     try:
-        d = pd.to_datetime(dt, errors="coerce")
+        # pandas não reconhece bem "BRT" e pode descartar tz; tratamos manualmente.
+        if raw and raw.upper().endswith("BRT"):
+            sem_tz = raw[:-3].strip()
+            d = pd.to_datetime(sem_tz, errors="coerce")
+        else:
+            d = pd.to_datetime(dt, errors="coerce")
     except Exception:
         return None
 
     if pd.isna(d):
         return None
 
-    # se vier tz quebrada (ex: "BRT"), pandas pode dropar tz.
     py = d.to_pydatetime()
 
     if py.tzinfo is None:
-        return py.replace(tzinfo=timezone.utc)
+        # Datas vindas da planilha sem tz explícita são horário local da operação (BRT).
+        py = py.replace(tzinfo=LOCAL_TZ)
 
     return py.astimezone(timezone.utc)
 
@@ -82,7 +95,7 @@ def _status_do_sistema(plan_status_raw: object) -> str | None:
     """
     LÓGICA DO SISTEMA (não copia status livremente)
     - ARRIVAL_SCHEDULED -> arrival_scheduled
-    - CLOSED -> None (ignora)
+    - CLOSED/DELETED -> None (ignora)
     - qualquer outro -> arrival
     """
     if plan_status_raw is None or (isinstance(plan_status_raw, float) and pd.isna(plan_status_raw)):
@@ -97,7 +110,7 @@ def _status_do_sistema(plan_status_raw: object) -> str | None:
 
     if s == "ARRIVAL_SCHEDULED":
         return "arrival_scheduled"
-    if s == "CLOSED":
+    if s in ("CLOSED", "DELETED"):
         return None
 
     return "arrival"
@@ -117,9 +130,12 @@ def processar_planilha():
     inseridas = 0
     atualizadas = 0
     ignoradas = 0
+    repetidas_no_arquivo = 0
     erros: list[str] = []
 
     agora = datetime.now(timezone.utc)
+
+    seen_appointments: set[str] = set()
 
     for idx, row in df.iterrows():
         try:
@@ -133,6 +149,11 @@ def processar_planilha():
             if not appointment_str:
                 ignoradas += 1
                 continue
+
+            if appointment_str in seen_appointments:
+                repetidas_no_arquivo += 1
+            else:
+                seen_appointments.add(appointment_str)
 
             type_raw = row.iloc[1] if len(row) > 1 else None
             truck_type, truck_tipo = _normalize_type(type_raw)
@@ -160,6 +181,11 @@ def processar_planilha():
             except Exception:
                 cartons_val = 0
 
+            # regra de negócio: cargas com units <= 0 são ignoradas
+            if units_val <= 0:
+                ignoradas += 1
+                continue
+
             # Priority score
             priority_score_raw = _get_col(row, "Priority Score", default=0) or 0
             try:
@@ -171,7 +197,7 @@ def processar_planilha():
             plan_status = _get_col(row, "Status", "STATUS", default=None)
             status = _status_do_sistema(plan_status)
 
-            # CLOSED -> ignorar
+            # CLOSED/DELETED -> ignorar
             if status is None:
                 ignoradas += 1
                 continue
@@ -253,5 +279,7 @@ def processar_planilha():
         "inseridas": inseridas,
         "atualizadas": atualizadas,
         "ignoradas": ignoradas,
+        "repetidas_no_arquivo": repetidas_no_arquivo,
+        "observacao": "Quando o mesmo Appointment ID aparece mais de uma vez, o sistema atualiza o registro já existente em vez de criar uma nova carga.",
         "erros": erros[:30],
     }), 200
