@@ -1,11 +1,17 @@
 from flask import Blueprint, render_template, request, jsonify, current_app
 import pandas as pd
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from db import db
 from models import Carga
 
 upload_bp = Blueprint("upload", __name__, url_prefix="/upload")
+
+try:
+    LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
+except Exception:
+    LOCAL_TZ = timezone(timedelta(hours=-3))
 
 
 @upload_bp.route("/")
@@ -61,19 +67,26 @@ def _to_utc_aware(dt):
     if dt is None or pd.isna(dt):
         return None
 
+    raw = str(dt).strip() if isinstance(dt, str) else None
+
     try:
-        d = pd.to_datetime(dt, errors="coerce")
+        # pandas não reconhece bem "BRT" e pode descartar tz; tratamos manualmente.
+        if raw and raw.upper().endswith("BRT"):
+            sem_tz = raw[:-3].strip()
+            d = pd.to_datetime(sem_tz, errors="coerce")
+        else:
+            d = pd.to_datetime(dt, errors="coerce")
     except Exception:
         return None
 
     if pd.isna(d):
         return None
 
-    # se vier tz quebrada (ex: "BRT"), pandas pode dropar tz.
     py = d.to_pydatetime()
 
     if py.tzinfo is None:
-        return py.replace(tzinfo=timezone.utc)
+        # Datas vindas da planilha sem tz explícita são horário local da operação (BRT).
+        py = py.replace(tzinfo=LOCAL_TZ)
 
     return py.astimezone(timezone.utc)
 

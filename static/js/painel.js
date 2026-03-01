@@ -62,6 +62,7 @@ function renderizarTabela(cargas) {
     cargas.forEach(carga => {
 
         const tr = document.createElement("tr");
+        tr.id = `row-carga-${carga.id}`;
         const prioridade = calcularPrioridade(Number(carga.priority_score ?? 0));
 
         // Linha vermelha quando SLA negativo (ARRIVAL ou ARRIVAL_SCHEDULED após expected)
@@ -94,9 +95,17 @@ function renderizarTabela(cargas) {
 
         tabela.appendChild(tr);
 
-        // Cronômetro apenas se estiver em checkin
+        // Cronômetro se estiver em checkin
         if (carga.status === "checkin" && carga.start_time) {
             iniciarCronometro(carga.id, carga.start_time);
+        }
+
+        // Timer SLA em tempo real para arrival / arrival_scheduled
+        if (
+            (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
+            typeof carga.tempo_sla_segundos === "number"
+        ) {
+            iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
         }
     });
 }
@@ -124,6 +133,29 @@ function atualizarTempoTela(id, totalSegundos) {
 
     const el = document.getElementById(`timer-${id}`);
     if (el) el.innerText = `${horas}:${minutos}:${segundos}`;
+}
+
+function iniciarTimerSLA(id, tempoInicialSegundos, status) {
+    const el = document.getElementById(`timer-${id}`);
+    if (!el) return;
+
+    const rowEl = document.getElementById(`row-carga-${id}`);
+
+    let restante = Number(tempoInicialSegundos);
+    el.innerText = formatarTempoSLA(restante);
+
+    if (rowEl && (status === "arrival" || status === "arrival_scheduled")) {
+        rowEl.classList.toggle("linha-atrasada", restante < 0);
+    }
+
+    timers[`sla-${id}`] = setInterval(() => {
+        restante -= 1;
+        el.innerText = formatarTempoSLA(restante);
+
+        if (rowEl && (status === "arrival" || status === "arrival_scheduled")) {
+            rowEl.classList.toggle("linha-atrasada", restante < 0);
+        }
+    }, 1000);
 }
 
 // =====================================================
