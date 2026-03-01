@@ -31,6 +31,16 @@ class Carga(db.Model):
     tempo_total_segundos = db.Column(db.Integer, nullable=True)
     units_por_hora = db.Column(db.Float, nullable=True)
 
+    # ARRIVAL SLA
+    arrived_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    sla_setar_aa_deadline = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    # Atraso persistente
+    atraso_registrado = db.Column(db.Boolean, default=False, nullable=False)
+    atraso_segundos = db.Column(db.Integer, default=0, nullable=False)
+    atraso_comentario = db.Column(db.Text, nullable=True)
+    atraso_comentado_em = db.Column(db.DateTime(timezone=True), nullable=True)
+
     delete_reason = db.Column(db.Text, nullable=True)
     deleted_at = db.Column(db.DateTime(timezone=True), nullable=True)
 

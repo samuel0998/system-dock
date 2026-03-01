@@ -33,35 +33,94 @@
     <div class="cards-container">
 
         <div class="card-dashboard card-units">
-            <h4>Total Units Fechadas</h4>
+            <div class="card-head"><h4>Total Units Fechadas</h4><span class="card-icon">📦</span></div>
             <span id="totalUnits">0</span>
+            <p>Volume concluído no período</p>
         </div>
 
         <div class="card-dashboard card-fechadas">
-            <h4>Notas Fechadas</h4>
+            <div class="card-head"><h4>Notas Fechadas</h4><span class="card-icon">✅</span></div>
             <span id="totalNotasFechadas">0</span>
+            <p>Cargas finalizadas</p>
         </div>
 
         <div class="card-dashboard card-pendentes">
-            <h4>Notas Pendentes</h4>
+            <div class="card-head"><h4>Notas Pendentes</h4><span class="card-icon">🕒</span></div>
             <span id="totalNotasPendentes">0</span>
+            <p>Em status arrival</p>
         </div>
 
         <div class="card-dashboard card-andamento">
-            <h4>Notas em Andamento</h4>
+            <div class="card-head"><h4>Notas em Andamento</h4><span class="card-icon">⚙️</span></div>
             <span id="totalNotasAndamento">0</span>
+            <p>Com operador em checkin</p>
         </div>
 
         <div class="card-dashboard card-deletadas">
-            <h4>Notas Deletadas</h4>
+            <div class="card-head"><h4>Notas Deletadas</h4><span class="card-icon">🗑️</span></div>
             <span id="totalNotasDeletadas">0</span>
+            <p>Removidas no período</p>
         </div>
 
         <div class="card-dashboard card-noshow">
-            <h4>Notas No Show</h4>
+            <div class="card-head"><h4>Notas No Show</h4><span class="card-icon">🚫</span></div>
             <span id="totalNotasNoShow">0</span>
+            <p>Agendamentos não comparecidos</p>
         </div>
 
+        <div class="card-dashboard card-atrasadas">
+            <div class="card-head"><h4>Cargas em Atraso (+4h)</h4><span class="card-icon">⏰</span></div>
+            <span id="totalCargasAtrasadas">0</span>
+            <p>SLA estourado no período</p>
+        </div>
+
+    </div>
+
+    <div class="dashboard-lista-atraso">
+        <div class="dashboard-lista-header">
+            <h4>Lista de Cargas em Atraso</h4>
+            <small>Somente cargas com SLA de +4h ultrapassado</small>
+            <input type="text" id="filtroAtrasoAppointment" placeholder="Filtrar Appointment ID" class="input-filtro-dashboard">
+        </div>
+        <div class="dashboard-lista-wrap">
+            <table class="tabela-cargas-atrasadas">
+                <thead>
+                    <tr>
+                        <th>Appointment ID</th>
+                        <th>Status</th>
+                        <th>Expected Arrival</th>
+                        <th>Atraso</th>
+                        <th>Units</th>
+                        <th>Cartons</th>
+                        <th>AA</th>
+                        <th>Comentário</th>
+                    </tr>
+                </thead>
+                <tbody id="listaCargasAtrasadas"></tbody>
+            </table>
+        </div>
+    </div>
+
+
+    <div class="dashboard-lista-atraso">
+        <div class="dashboard-lista-header">
+            <h4>Produtividade por AA</h4>
+            <small>Units, horas produzidas e rate (units/h)</small>
+            <input type="text" id="filtroProdLogin" placeholder="Filtrar login" class="input-filtro-dashboard">
+        </div>
+        <div class="dashboard-lista-wrap">
+            <table class="tabela-cargas-atrasadas">
+                <thead>
+                    <tr>
+                        <th>Login</th>
+                        <th>Units</th>
+                        <th>Horas Produzidas</th>
+                        <th>Rate (units/h)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaProdutividadeAA"></tbody>
+            </table>
+        </div>
     </div>
 
     <!-- ========================= -->
