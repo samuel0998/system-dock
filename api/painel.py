@@ -60,28 +60,38 @@ def listar_cargas():
 
             tempo_sla_segundos = None
 
-            # ✅ SLA só existe em ARRIVAL (4h após clicar "CARGA CHEGOU")
-            if c.status == "arrival":
-                if c.sla_setar_aa_deadline is None:
-                    # fallback defensivo caso algum registro antigo esteja sem deadline
-                    base = c.arrived_at or agora
-                    c.arrived_at = c.arrived_at or base
-                    c.sla_setar_aa_deadline = base + timedelta(hours=4)
-                    mudou_algo = True
+            # ✅ Nova regra de contagem:
+            # - ARRIVAL: mantém deadline de 4h a partir de "carga chegou"
+            # - ARRIVAL_SCHEDULED: após passar do expected, inicia contagem de 4h
+            if c.status in ("arrival", "arrival_scheduled"):
+                deadline = None
 
-                deadline = c.sla_setar_aa_deadline
+                if c.status == "arrival":
+                    if c.sla_setar_aa_deadline is None:
+                        # fallback defensivo caso algum registro antigo esteja sem deadline
+                        base = c.arrived_at or agora
+                        c.arrived_at = c.arrived_at or base
+                        c.sla_setar_aa_deadline = base + timedelta(hours=4)
+                        mudou_algo = True
+
+                    deadline = c.sla_setar_aa_deadline
+
+                elif c.status == "arrival_scheduled" and expected and agora > expected:
+                    deadline = expected + timedelta(hours=4)
+
                 if deadline and deadline.tzinfo is None:
                     deadline = deadline.replace(tzinfo=timezone.utc)
 
-                tempo_sla_segundos = int((deadline - agora).total_seconds())
+                if deadline:
+                    tempo_sla_segundos = int((deadline - agora).total_seconds())
 
-                # ✅ registrador de atraso persistente (mesmo se depois setar AA)
-                if tempo_sla_segundos < 0:
-                    atraso_atual = abs(tempo_sla_segundos)
-                    if (not c.atraso_registrado) or (atraso_atual > int(c.atraso_segundos or 0)):
-                        c.atraso_segundos = atraso_atual
-                        c.atraso_registrado = True
-                        mudou_algo = True
+                    # ✅ registrador de atraso persistente
+                    if tempo_sla_segundos < 0:
+                        atraso_atual = abs(tempo_sla_segundos)
+                        if (not c.atraso_registrado) or (atraso_atual > int(c.atraso_segundos or 0)):
+                            c.atraso_segundos = atraso_atual
+                            c.atraso_registrado = True
+                            mudou_algo = True
 
             lista.append({
                 "id": c.id,
@@ -90,7 +100,7 @@ def listar_cargas():
                 "truck_type": getattr(c, "truck_type", None),
                 "truck_tipo": getattr(c, "truck_tipo", None),
 
-                "expected_arrival_date": c.expected_arrival_date.isoformat() if c.expected_arrival_date else None,
+                "expected_arrival_date": expected.isoformat() if expected else None,
                 "status": c.status,
 
                 "units": int(c.units or 0),
