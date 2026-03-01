@@ -33,7 +33,7 @@ def _to_local_day_bounds_utc(ref_utc=None):
     return inicio_local.astimezone(timezone.utc), fim_local.astimezone(timezone.utc)
 
 
-def _sync_transferencias_do_dia():
+def _sync_transferencias_do_dia() -> bool:
     inicio_utc, fim_utc = _to_local_day_bounds_utc()
 
     cargas_transfer = (
@@ -46,6 +46,8 @@ def _sync_transferencias_do_dia():
         )
         .all()
     )
+
+    mudou = False
 
     for carga in cargas_transfer:
         t = Transferencia.query.filter_by(appointment_id=carga.appointment_id).first()
@@ -60,12 +62,32 @@ def _sync_transferencias_do_dia():
                 created_at=datetime.now(timezone.utc),
             )
             db.session.add(t)
+            mudou = True
         else:
+            before = (
+                t.carga_id,
+                _to_aware_utc(t.expected_arrival_date),
+                t.status_carga,
+                int(t.units or 0),
+                int(t.cartons or 0),
+            )
             t.carga_id = carga.id
             t.expected_arrival_date = _to_aware_utc(carga.expected_arrival_date)
             t.status_carga = carga.status
             t.units = int(carga.units or 0)
             t.cartons = int(carga.cartons or 0)
+
+            after = (
+                t.carga_id,
+                _to_aware_utc(t.expected_arrival_date),
+                t.status_carga,
+                int(t.units or 0),
+                int(t.cartons or 0),
+            )
+            if before != after:
+                mudou = True
+
+    return mudou
 
 
 def _atualizar_estado_prazo(t: Transferencia, agora_utc: datetime):
@@ -93,7 +115,7 @@ def transferin_page():
 
 @transferin_bp.route("/listar")
 def listar_transferencias():
-    _sync_transferencias_do_dia()
+    mudou_sync = _sync_transferencias_do_dia()
 
     appointment_q = (request.args.get("appointment") or "").strip().lower()
     origem_q = (request.args.get("origem") or "").strip().upper()
@@ -147,7 +169,7 @@ def listar_transferencias():
             "tempo_prazo_segundos": tempo_prazo_segundos,
         })
 
-    if mudou:
+    if mudou or mudou_sync:
         db.session.commit()
 
     return jsonify(out)
@@ -156,10 +178,30 @@ def listar_transferencias():
 @transferin_bp.route("/atualizar/<int:transfer_id>", methods=["POST"])
 def atualizar_transferencia(transfer_id):
     t = Transferencia.query.get(transfer_id)
+    data = request.get_json(silent=True) or {}
+    appointment_id = (data.get("appointment_id") or "").strip()
+
+    if not t and appointment_id:
+        t = Transferencia.query.filter_by(appointment_id=appointment_id).first()
+
+    if not t and appointment_id:
+        carga = Carga.query.filter_by(appointment_id=appointment_id).first()
+        if carga:
+            t = Transferencia(
+                appointment_id=appointment_id,
+                carga_id=carga.id,
+                expected_arrival_date=_to_aware_utc(carga.expected_arrival_date),
+                status_carga=carga.status,
+                units=int(carga.units or 0),
+                cartons=int(carga.cartons or 0),
+                created_at=datetime.now(timezone.utc),
+            )
+            db.session.add(t)
+            db.session.flush()
+
     if not t:
         return jsonify({"error": "Transferência não encontrada"}), 404
 
-    data = request.get_json(silent=True) or {}
     vrid = (data.get("vrid") or "").strip()
     origem = (data.get("origem") or "").strip().upper()
     late_stow = (data.get("late_stow_deadline") or "").strip()

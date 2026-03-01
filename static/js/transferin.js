@@ -1,4 +1,5 @@
 let transferenciaSelecionada = null;
+let transferenciaAppointmentSelecionada = "";
 let timersTransfer = {};
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -53,7 +54,7 @@ function renderizarTransferencias(lista) {
             <td id="timer-transfer-${t.id}">${formatarTempoPrazo(t.tempo_prazo_segundos, t.finalizada)}</td>
             <td><span class="badge-transfer badge-${statusCard}">${statusCard}</span></td>
             <td>
-                <button class="btn-acao" onclick="abrirModalTransfer('${t.id}', '${escapeJs(t.vrid || "")}', '${(t.origem || "")}', '${toDatetimeLocal(t.late_stow_deadline)}')">✏️</button>
+                <button class="btn-acao" onclick="abrirModalTransfer('${t.id ?? ""}', '${escapeJs(t.appointment_id || "")}', '${escapeJs(t.vrid || "")}', '${(t.origem || "")}', '${toDatetimeLocal(t.late_stow_deadline)}')">✏️</button>
                 ${t.info_preenchida && !t.finalizada ? `<button class="btn-filtrar" onclick="finalizarTransfer('${t.id}')">Finalizar</button>` : ""}
             </td>
         `;
@@ -100,10 +101,14 @@ function formatarTempoPrazo(segundos, finalizada) {
     return `${neg ? "-" : ""}${h}:${m}:${s}`;
 }
 
-function abrirModalTransfer(id, vrid, origem, lateStow) {
-    transferenciaSelecionada = id;
+function abrirModalTransfer(id, appointmentId, vrid, origem, lateStow) {
+    transferenciaSelecionada = id || "";
+    transferenciaAppointmentSelecionada = appointmentId || "";
     const modal = document.getElementById("modalTransferInfo");
     if (!modal) return;
+
+    const appointmentEl = document.getElementById("transferAppointmentId");
+    if (appointmentEl) appointmentEl.textContent = transferenciaAppointmentSelecionada || "-";
 
     document.getElementById("transferVrid").value = vrid || "";
     document.getElementById("transferOrigem").value = origem || "";
@@ -114,6 +119,7 @@ function abrirModalTransfer(id, vrid, origem, lateStow) {
 
 function fecharModalTransfer() {
     transferenciaSelecionada = null;
+    transferenciaAppointmentSelecionada = "";
     const modal = document.getElementById("modalTransferInfo");
     if (modal) modal.style.display = "none";
 }
@@ -123,10 +129,18 @@ function salvarTransferInfo() {
     const origem = (document.getElementById("transferOrigem")?.value || "").trim();
     const late_stow_deadline = (document.getElementById("transferLateStow")?.value || "").trim();
 
-    fetch(`/transferin/atualizar/${transferenciaSelecionada}`, {
+    const transferId = Number(transferenciaSelecionada);
+    const endpointId = Number.isFinite(transferId) ? transferId : 0;
+
+    fetch(`/transferin/atualizar/${endpointId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vrid, origem, late_stow_deadline })
+        body: JSON.stringify({
+            vrid,
+            origem,
+            late_stow_deadline,
+            appointment_id: transferenciaAppointmentSelecionada,
+        })
     })
         .then(r => r.json())
         .then(resp => {

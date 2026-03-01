@@ -1010,3 +1010,206 @@ body.dark-mode .transfer-table tbody tr.transfer-pendente td { background: #1e29
 body.dark-mode .transfer-table tbody tr.transfer-preenchida td { background: #1b4332; }
 body.dark-mode .transfer-table tbody tr.transfer-atrasada td { background: #5b1d1d; }
 body.dark-mode .transfer-table tbody tr.transfer-finalizada td { background: #1e3a8a; }
+
+.transfer-modal-content {
+    width: min(560px, 92vw);
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    background: linear-gradient(160deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.22);
+}
+
+.transfer-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.transfer-modal-header h3 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.transfer-pill {
+    font-size: 12px;
+    color: #1e3a8a;
+    background: #dbeafe;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid #bfdbfe;
+}
+
+.transfer-form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.transfer-form-grid .filtro-grupo label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.transfer-form-grid input,
+.transfer-form-grid select {
+    height: 40px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+    padding: 0 12px;
+    font-size: 14px;
+}
+
+.transfer-form-grid input:focus,
+.transfer-form-grid select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.transfer-modal-actions {
+    margin-top: 18px;
+}
+
+.transfer-save-btn {
+    background: linear-gradient(120deg, #2563eb, #1d4ed8);
+}
+
+body.dark-mode .transfer-modal-content {
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+    border-color: #334155;
+}
+
+body.dark-mode .transfer-modal-header h3 {
+    color: #f8fafc;
+}
+
+body.dark-mode .transfer-pill {
+    color: #dbeafe;
+    background: #1e40af;
+    border-color: #1d4ed8;
+}
+
+body.dark-mode .transfer-form-grid .filtro-grupo label {
+    color: #cbd5e1;
+}
+
+body.dark-mode .transfer-form-grid input,
+body.dark-mode .transfer-form-grid select {
+    background: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+body.dark-mode .tabela-container-moderna .tabela-cargas td {
+    background: #1e293b;
+    color: #e5e7eb;
+}
+
+body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr:nth-child(even) td {
+    background: #172033;
+}
+
+body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr:hover td {
+    background: #253046;
+}
+
+body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada td,
+body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:nth-child(even) td,
+body.dark-mode .tabela-container-moderna .tabela-cargas tbody tr.linha-atrasada:hover td {
+    background: #5b1d1d;
+}
+
+body.dark-mode .appointment-link {
+    color: #93c5fd;
+}
+
+.btn-comentario-atraso {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    margin-right: 6px;
+    font-size: 12px;
+}
+
+.btn-comentario-atraso:hover {
+    background: #1d4ed8;
+}
+
+.input-filtro-dashboard {
+    margin-left: auto;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    min-width: 220px;
+}
+
+.btn-balao {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.dashboard-lista-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+body.dark-mode .input-filtro-dashboard {
+    background: #111827;
+    color: #e5e7eb;
+    border-color: #374151;
+}
+
+body.dark-mode .btn-balao {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+.transfer-table tbody tr.transfer-pendente td {
+    background: #f8fafc;
+}
+
+.transfer-table tbody tr.transfer-preenchida td {
+    background: #e7f8ee;
+}
+
+.transfer-table tbody tr.transfer-atrasada td {
+    background: #ffe5e5;
+}
+
+.transfer-table tbody tr.transfer-finalizada td {
+    background: #eef2ff;
+}
+
+.badge-transfer {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.badge-pendente { background: #e2e8f0; color: #334155; }
+.badge-preenchida { background: #bbf7d0; color: #166534; }
+.badge-atrasada { background: #fecaca; color: #991b1b; }
+.badge-finalizada { background: #c7d2fe; color: #3730a3; }
+
+body.dark-mode .transfer-table tbody tr.transfer-pendente td { background: #1e293b; }
+body.dark-mode .transfer-table tbody tr.transfer-preenchida td { background: #1b4332; }
+body.dark-mode .transfer-table tbody tr.transfer-atrasada td { background: #5b1d1d; }
+body.dark-mode .transfer-table tbody tr.transfer-finalizada td { background: #1e3a8a; }
