@@ -63,6 +63,8 @@ def run():
       -- Atraso persistente
       atraso_registrado BOOLEAN NOT NULL DEFAULT FALSE,
       atraso_segundos INTEGER NOT NULL DEFAULT 0,
+      atraso_comentario TEXT NULL,
+      atraso_comentado_em TIMESTAMP NULL,
 
       -- Exclusão lógica
       delete_reason VARCHAR(255) NULL,
