@@ -20,6 +20,10 @@ document.addEventListener("DOMContentLoaded", () => {
 let timers = {};
 let cargasGlobais = [];
 
+function can(cap) {
+    return Boolean(window.AUTH_CAPS && window.AUTH_CAPS[cap]);
+}
+
 // =====================================================
 // 🔄 CARREGAR CARGAS
 // =====================================================
@@ -121,6 +125,7 @@ function isCargaAtrasada(carga) {
 }
 
 function renderizarComentarioAtraso(carga) {
+    if (!can("painel_comment")) return "-";
     if (!isCargaAtrasada(carga)) return "-";
 
     const textoBotao = carga.atraso_comentario ? "Editar comentário" : "Comentar atraso";
@@ -231,36 +236,87 @@ function formatarSegundos(total) {
 // 🔘 AÇÕES / BOTÕES
 // =====================================================
 function renderizarBotaoAcao(carga) {
+    const expertBtn = can("expert_manage")
+        ? `<button class="btn-comentario-atraso" onclick="expertGerenciarCarga('${carga.id}')">Expert</button>`
+        : "";
 
     // ARRIVAL_SCHEDULED -> botão CARGA CHEGOU (vira ARRIVAL e inicia SLA)
     if (carga.status === "arrival_scheduled") {
         return `
-            <button class="btn-acao" onclick="cargaChegou('${carga.id}')">CARGA CHEGOU</button>
-            <button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>
+            ${can("painel_carga_chegou") ? `<button class="btn-acao" onclick="cargaChegou('${carga.id}')">CARGA CHEGOU</button>` : "-"}
+            ${can("painel_delete") ? `<button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>` : ""}
+            ${expertBtn}
         `;
     }
 
     // ARRIVAL -> botão Setar AA
     if (carga.status === "arrival") {
         return `
-            <button class="btn-acao" onclick="abrirModalAA('${carga.id}')">Setar AA</button>
-            <button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>
+            ${can("painel_set_aa") ? `<button class="btn-acao" onclick="abrirModalAA('${carga.id}')">Setar AA</button>` : "-"}
+            ${can("painel_delete") ? `<button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>` : ""}
+            ${expertBtn}
         `;
     }
 
     // CHECKIN -> Finalizar
     if (carga.status === "checkin") {
         return `
-            <button class="btn-acao" onclick="finalizar('${carga.id}')">Finalizar</button>
-            <button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>
+            ${can("painel_finalize") ? `<button class="btn-acao" onclick="finalizar('${carga.id}')">Finalizar</button>` : "-"}
+            ${can("painel_delete") ? `<button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>` : ""}
+            ${expertBtn}
         `;
     }
 
-    if (carga.status === "closed") return "Concluída";
+    if (carga.status === "closed") return `Concluída ${expertBtn}`;
     if (carga.status === "no_show") return `<span class="status-no-show">No Show</span>`;
     if (carga.status === "deleted") return `<span class="status-deleted">Deletada</span>`;
 
     return "-";
+}
+
+function expertGerenciarCarga(cargaId) {
+    if (!can("expert_manage")) return;
+
+    const acao = prompt("EXPERT: digite 'delete' para apagar do banco, ou 'edit' para editar campos.");
+    if (!acao) return;
+
+    if (acao.toLowerCase() === "delete") {
+        if (!confirm("Confirma hard delete desta carga no banco?")) return;
+        fetch(`/pc/expert/manage/${cargaId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "hard_delete" })
+        })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp?.error) return alert(resp.error);
+                carregarCargas();
+            });
+        return;
+    }
+
+    if (acao.toLowerCase() === "edit") {
+        const raw = prompt("Cole JSON de atualização. Ex: {\"status\":\"arrival\",\"units\":120}");
+        if (!raw) return;
+        let updates;
+        try {
+            updates = JSON.parse(raw);
+        } catch {
+            alert("JSON inválido.");
+            return;
+        }
+
+        fetch(`/pc/expert/manage/${cargaId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "edit", updates })
+        })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp?.error) return alert(resp.error);
+                carregarCargas();
+            });
+    }
 }
 
 // ARRIVAL_SCHEDULED -> ARRIVAL

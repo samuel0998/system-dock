@@ -3,6 +3,10 @@ let transferenciaAppointmentSelecionada = "";
 let timersTransfer = {};
 let transferenciasCache = [];
 
+function can(cap) {
+    return Boolean(window.AUTH_CAPS && window.AUTH_CAPS[cap]);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     carregarTransferencias();
 });
@@ -58,8 +62,8 @@ function renderizarTransferencias(lista) {
             <td><span class="badge-transfer badge-${statusCard}">${statusCard}</span></td>
             <td>${renderComentarioLateStow(t)}</td>
             <td>
-                <button class="btn-acao" onclick="abrirModalTransfer('${t.id ?? ""}', '${escapeJs(t.appointment_id || "")}', '${escapeJs(t.vrid || "")}', '${(t.origem || "")}', '${toDatetimeLocal(t.late_stow_deadline)}')">✏️</button>
-                ${t.info_preenchida && !t.finalizada ? `<button class="btn-filtrar" onclick="finalizarTransfer('${t.id}')">Finalizar</button>` : ""}
+                ${can("transferin_edit") ? `<button class="btn-acao" onclick="abrirModalTransfer('${t.id ?? ""}', '${escapeJs(t.appointment_id || "")}', '${escapeJs(t.vrid || "")}', '${(t.origem || "")}', '${toDatetimeLocal(t.late_stow_deadline)}')">✏️</button>` : "-"}
+                ${can("transferin_edit") && t.info_preenchida && !t.finalizada ? `<button class="btn-filtrar" onclick="finalizarTransfer('${t.id}')">Finalizar</button>` : ""}
             </td>
         `;
 
@@ -72,6 +76,7 @@ function renderizarTransferencias(lista) {
 }
 
 function renderComentarioLateStow(t) {
+    if (!can("transferin_edit")) return "-";
     if (!t.prazo_estourado) return "-";
 
     const title = t.comentario_late_stow ? `title="${escapeHtml(t.comentario_late_stow)}"` : "title='Adicionar comentário'";

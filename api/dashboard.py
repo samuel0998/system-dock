@@ -4,16 +4,19 @@ from sqlalchemy import func
 
 from db import db
 from models import Carga, Transferencia
+from api.auth import require_capability, has_capability
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
 
 @dashboard_bp.route("/")
+@require_capability("dashboard_access")
 def dashboard_page():
     return render_template("dashboard.html")
 
 
 @dashboard_bp.route("/stats")
+@require_capability("dashboard_access")
 def dashboard_stats():
     data_inicio = request.args.get("dataInicio")
     data_fim = request.args.get("dataFim")
@@ -333,7 +336,7 @@ def dashboard_stats():
             "comentario_late_stow": t.comentario_late_stow,
         })
 
-    return jsonify({
+    payload = {
         "total_units": int(total_units),
         "total_units_no_show": int(total_units_no_show),
         "total_notas_fechadas": int(total_notas_fechadas),
@@ -351,4 +354,12 @@ def dashboard_stats():
         "cargas_atrasadas": cargas_atrasadas[:50],
         "total_transferencias_late_stow": len(transferencias_late),
         "transferencias_late_stow": transferencias_late[:100],
-    })
+    }
+
+    if not has_capability("dashboard_tables"):
+        payload["cargas_atrasadas"] = []
+        payload["transferencias_late_stow"] = []
+        payload["por_login"] = {}
+        payload["produtividade_por_aa"] = {}
+
+    return jsonify(payload)

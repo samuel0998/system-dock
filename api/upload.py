@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 from db import db
 from models import Carga
+from api.auth import require_capability
 
 upload_bp = Blueprint("upload", __name__, url_prefix="/upload")
 
@@ -15,6 +16,7 @@ except Exception:
 
 
 @upload_bp.route("/")
+@require_capability("upload")
 def upload_page():
     return render_template("upload.html")
 
@@ -117,6 +119,7 @@ def _status_do_sistema(plan_status_raw: object) -> str | None:
 
 
 @upload_bp.route("/processar", methods=["POST"])
+@require_capability("upload")
 def processar_planilha():
     file = request.files.get("file")
     if not file:

@@ -6,7 +6,7 @@ from api.upload import upload_bp
 from api.painel import painel_bp
 from api.dashboard import dashboard_bp
 from api.transferin import transferin_bp
-from api.auth import auth_bp
+from api.auth import auth_bp, current_capabilities, current_role
 
 from db import init_db, db
 import models  # garante que os models sejam importados (Carga etc.)
@@ -54,6 +54,13 @@ def create_app() -> Flask:
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(transferin_bp)
     app.register_blueprint(auth_bp)
+
+    @app.context_processor
+    def inject_auth_context():
+        return {
+            "auth_role": current_role(),
+            "auth_caps": current_capabilities(),
+        }
 
     @app.before_request
     def _auth_guard():

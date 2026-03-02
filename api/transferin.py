@@ -6,6 +6,7 @@ from sqlalchemy import or_
 
 from db import db
 from models import Carga, Transferencia
+from api.auth import require_capability
 
 try:
     LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
@@ -109,11 +110,13 @@ def _atualizar_estado_prazo(t: Transferencia, agora_utc: datetime):
 
 
 @transferin_bp.route("/")
+@require_capability("transferin_view")
 def transferin_page():
     return render_template("transferin.html")
 
 
 @transferin_bp.route("/listar")
+@require_capability("transferin_view")
 def listar_transferencias():
     mudou_sync = _sync_transferencias_do_dia()
 
@@ -177,6 +180,7 @@ def listar_transferencias():
 
 
 @transferin_bp.route("/atualizar/<int:transfer_id>", methods=["POST"])
+@require_capability("transferin_edit")
 def atualizar_transferencia(transfer_id):
     t = Transferencia.query.get(transfer_id)
     data = request.get_json(silent=True) or {}
@@ -232,6 +236,7 @@ def atualizar_transferencia(transfer_id):
 
 
 @transferin_bp.route("/finalizar/<int:transfer_id>", methods=["POST"])
+@require_capability("transferin_edit")
 def finalizar_transferencia(transfer_id):
     t = Transferencia.query.get(transfer_id)
     if not t:
@@ -246,6 +251,7 @@ def finalizar_transferencia(transfer_id):
 
 
 @transferin_bp.route("/comentar/<int:transfer_id>", methods=["POST"])
+@require_capability("transferin_edit")
 def comentar_transferencia(transfer_id):
     t = Transferencia.query.get(transfer_id)
     if not t:

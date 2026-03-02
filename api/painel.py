@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from db import db
 from models import Carga  # Operador pode ficar no models, mas aqui vamos consultar via SQL direto
+from api.auth import require_capability
 
 painel_bp = Blueprint("painel", __name__, url_prefix="/pc")
 
@@ -133,6 +134,7 @@ def listar_cargas():
 
 
 @painel_bp.route("/checkin/<int:carga_id>", methods=["POST"])
+@require_capability("painel_set_aa")
 def checkin(carga_id):
     dados = request.get_json(silent=True) or {}
     aa_login = (dados.get("aa_responsavel") or "").strip()
@@ -153,6 +155,7 @@ def checkin(carga_id):
 
 
 @painel_bp.route("/finalizar/<int:carga_id>", methods=["POST"])
+@require_capability("painel_finalize")
 def finalizar(carga_id):
     carga = Carga.query.get(carga_id)
     if not carga:
@@ -188,6 +191,7 @@ def finalizar(carga_id):
 
 
 @painel_bp.route("/limpar-banco", methods=["DELETE"])
+@require_capability("expert_manage")
 def limpar_banco():
     deletadas = db.session.query(Carga).delete(synchronize_session=False)
     db.session.commit()
@@ -201,6 +205,7 @@ def limpar_banco():
 
 
 @painel_bp.route("/deletar/<int:carga_id>", methods=["POST"])
+@require_capability("painel_delete")
 def deletar_carga(carga_id):
     data = request.get_json(silent=True) or {}
     motivo = (data.get("motivo") or "").strip()
@@ -222,6 +227,7 @@ def deletar_carga(carga_id):
 
 
 @painel_bp.route("/carga-chegou/<int:carga_id>", methods=["POST"])
+@require_capability("painel_carga_chegou")
 def carga_chegou(carga_id):
     try:
         c = Carga.query.get_or_404(carga_id)
@@ -243,6 +249,7 @@ def carga_chegou(carga_id):
 
 
 @painel_bp.route("/comentar-atraso/<int:carga_id>", methods=["POST"])
+@require_capability("painel_comment")
 def comentar_atraso(carga_id):
     data = request.get_json(silent=True) or {}
     comentario = (data.get("comentario") or "").strip()
@@ -264,6 +271,49 @@ def comentar_atraso(carga_id):
     return jsonify({"message": "Comentário de atraso salvo"}), 200
 
 
+@painel_bp.route("/expert/manage/<int:carga_id>", methods=["POST"])
+@require_capability("expert_manage")
+def expert_manage_carga(carga_id):
+    carga = Carga.query.get(carga_id)
+    if not carga:
+        return jsonify({"error": "Carga não encontrada"}), 404
+
+    data = request.get_json(silent=True) or {}
+    action = (data.get("action") or "").strip().lower()
+
+    if action == "hard_delete":
+        db.session.delete(carga)
+        db.session.commit()
+        return jsonify({"message": "Carga deletada do banco com sucesso"}), 200
+
+    if action == "edit":
+        allowed_fields = {
+            "appointment_id",
+            "status",
+            "units",
+            "cartons",
+            "aa_responsavel",
+            "truck_type",
+            "truck_tipo",
+        }
+
+        updates = data.get("updates") or {}
+        for field, value in updates.items():
+            if field not in allowed_fields:
+                continue
+            if field in {"units", "cartons"}:
+                try:
+                    value = int(value)
+                except Exception:
+                    continue
+            setattr(carga, field, value)
+
+        db.session.commit()
+        return jsonify({"message": "Carga atualizada com sucesso"}), 200
+
+    return jsonify({"error": "Ação inválida"}), 400
+
+
 # =====================================================
 # AA DISPONÍVEIS (LÓGICA POR 2 TABELAS)
 #
@@ -277,6 +327,7 @@ def comentar_atraso(carga_id):
 # - join por badge: movimentos.badge pode bater com operadores.tag OU operadores.badge
 # =====================================================
 @painel_bp.route("/aa-disponiveis")
+@require_capability("painel_set_aa")
 def aa_disponiveis():
     try:
         query = text(

@@ -82,6 +82,7 @@
 
     </div>
 
+    {% if auth_caps.get('dashboard_tables') %}
     <div class="dashboard-lista-atraso">
         <div class="dashboard-lista-header">
             <h4>Lista de Cargas em Atraso</h4>
@@ -153,6 +154,7 @@
             </table>
         </div>
     </div>
+    {% endif %}
 
     <!-- ========================= -->
     <!-- 🔥 GRÁFICOS PRINCIPAIS -->
