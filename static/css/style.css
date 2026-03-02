@@ -1333,6 +1333,138 @@ body.dark-mode .transfer-form-grid select {
     color: #991b1b;
 }
 
+body.dark-mode .transfer-modal-content {
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+    border-color: #334155;
+}
+
+body.dark-mode .transfer-modal-header h3 {
+    color: #f8fafc;
+}
+
+body.dark-mode .transfer-pill {
+    color: #dbeafe;
+    background: #1e40af;
+    border-color: #1d4ed8;
+}
+
+body.dark-mode .transfer-form-grid .filtro-grupo label {
+    color: #cbd5e1;
+}
+
+body.dark-mode .transfer-form-grid input,
+body.dark-mode .transfer-form-grid select {
+    background: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+.nav-link-logout {
+    background: rgba(185, 28, 28, 0.28) !important;
+    border-color: rgba(248, 113, 113, 0.45) !important;
+    color: #fecaca !important;
+    cursor: pointer;
+}
+
+.nav-link-logout:hover {
+    background: rgba(220, 38, 38, 0.38) !important;
+    color: #fff !important;
+}
+
+.auth-body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 20% 20%, #1e3a8a 0%, #0f172a 45%, #020617 100%);
+}
+
+.auth-card {
+    width: min(420px, 92vw);
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 24px 55px rgba(2, 6, 23, 0.45);
+    border: 1px solid #dbeafe;
+}
+
+.auth-logo-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    background: radial-gradient(circle at 30% 30%, #1e40af 0%, #0f172a 70%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.auth-logo {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+}
+
+.auth-card h1 {
+    margin: 4px 0;
+    font-size: 24px;
+    color: #0f172a;
+}
+
+.auth-card p {
+    margin: 0 0 16px;
+    color: #64748b;
+}
+
+.auth-form {
+    display: grid;
+    gap: 10px;
+}
+
+.auth-form label {
+    font-weight: 600;
+    color: #334155;
+}
+
+.auth-form input {
+    height: 42px;
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
+    padding: 0 12px;
+    font-size: 14px;
+}
+
+.auth-form input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.auth-form button {
+    margin-top: 4px;
+    border-radius: 10px;
+    height: 42px;
+    font-weight: 700;
+    background: linear-gradient(120deg, #2563eb, #1d4ed8);
+}
+
+.auth-messages {
+    margin-bottom: 12px;
+}
+
+.auth-alert {
+    font-size: 13px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+}
+
+.auth-alert-error {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #991b1b;
+}
+
 body.dark-mode .tabela-container-moderna .tabela-cargas td {
     background: #1e293b;
     color: #e5e7eb;

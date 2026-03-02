@@ -130,10 +130,11 @@ def login_submit():
         return redirect(url_for("auth.login_page"))
 
     try:
+        # SELECT * para suportar bancos com nomes de coluna diferentes sem quebrar login.
         row = db.session.execute(
             text(
                 """
-                SELECT login, nome, permission_dockview
+                SELECT *
                 FROM operadores
                 WHERE UPPER(login) = UPPER(:login)
                 LIMIT 1
@@ -149,7 +150,15 @@ def login_submit():
         flash("Operador não encontrado.", "error")
         return redirect(url_for("auth.login_page"))
 
-    role = _normalize_role(row.get("permission_dockview"))
+    # Prioridade: nível explícito > flag booleana legada.
+    role_raw = (
+        row.get("permission_level_dockview")
+        or row.get("permission_nivel_dockview")
+        or row.get("nivel_permissao_dockview")
+        or row.get("permission_level")
+        or row.get("permission_dockview")
+    )
+    role = _normalize_role(role_raw)
     if not role:
         flash("Você não possui permissão Dock View.", "error")
         return redirect(url_for("auth.login_page"))
