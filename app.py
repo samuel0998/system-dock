@@ -1,10 +1,12 @@
 import os
-from flask import Flask, jsonify
+from flask import Flask, jsonify, session, request, redirect, url_for
 from flask_cors import CORS
 
 from api.upload import upload_bp
 from api.painel import painel_bp
 from api.dashboard import dashboard_bp
+from api.transferin import transferin_bp
+from api.auth import auth_bp, current_capabilities, current_role
 
 from db import init_db, db
 import models  # garante que os models sejam importados (Carga etc.)
@@ -31,6 +33,7 @@ def _maybe_reset_cargas(app: Flask) -> None:
 
 def create_app() -> Flask:
     app = Flask(__name__)
+    app.secret_key = os.getenv("SECRET_KEY", "dock-view-dev-secret")
 
     # Configs básicas
     app.config["JSON_SORT_KEYS"] = False
@@ -49,6 +52,36 @@ def create_app() -> Flask:
     app.register_blueprint(upload_bp)
     app.register_blueprint(painel_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(transferin_bp)
+    app.register_blueprint(auth_bp)
+
+    @app.context_processor
+    def inject_auth_context():
+        return {
+            "auth_role": current_role(),
+            "auth_caps": current_capabilities(),
+        }
+
+    @app.before_request
+    def _auth_guard():
+        path = request.path or ""
+
+        if (
+            path.startswith("/static/")
+            or path.startswith("/auth/")
+            or path in ("/", "/health")
+        ):
+            return None
+
+        if session.get("auth_ok"):
+            return None
+
+        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        accepts_json = "application/json" in (request.headers.get("Accept") or "")
+        if is_ajax or accepts_json or request.method != "GET":
+            return jsonify({"error": "Não autenticado"}), 401
+
+        return redirect(url_for("auth.login_page"))
 
     # Healthcheck
     @app.get("/")
