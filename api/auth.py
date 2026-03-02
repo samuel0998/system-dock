@@ -82,6 +82,56 @@ def _normalize_role(raw_permission) -> str | None:
     return None
 
 
+
+
+def _resolve_role_from_row(row) -> str | None:
+    # Prioridade: nível explícito > flag booleana legada.
+    role_raw = (
+        row.get("permission_level_dockview")
+        or row.get("permission_nivel_dockview")
+        or row.get("nivel_permissao_dockview")
+        or row.get("permission_level")
+        or row.get("permission_dockview")
+    )
+    return _normalize_role(role_raw)
+
+
+def refresh_session_role_from_db() -> bool:
+    """Atualiza session['permission_level'] com base no banco para o operador logado.
+    Retorna True se sessão continua válida, False caso contrário.
+    """
+    if not session.get("auth_ok"):
+        return False
+
+    login = (session.get("operator_login") or "").strip()
+    if not login:
+        return False
+
+    try:
+        row = db.session.execute(
+            text(
+                """
+                SELECT *
+                FROM operadores
+                WHERE UPPER(login) = UPPER(:login)
+                LIMIT 1
+                """
+            ),
+            {"login": login},
+        ).mappings().first()
+    except Exception:
+        return False
+
+    if not row:
+        return False
+
+    role = _resolve_role_from_row(row)
+    if not role:
+        return False
+
+    session["permission_level"] = role
+    return True
+
 def current_role() -> str | None:
     return session.get("permission_level")
 
@@ -150,15 +200,7 @@ def login_submit():
         flash("Operador não encontrado.", "error")
         return redirect(url_for("auth.login_page"))
 
-    # Prioridade: nível explícito > flag booleana legada.
-    role_raw = (
-        row.get("permission_level_dockview")
-        or row.get("permission_nivel_dockview")
-        or row.get("nivel_permissao_dockview")
-        or row.get("permission_level")
-        or row.get("permission_dockview")
-    )
-    role = _normalize_role(role_raw)
+    role = _resolve_role_from_row(row)
     if not role:
         flash("Você não possui permissão Dock View.", "error")
         return redirect(url_for("auth.login_page"))

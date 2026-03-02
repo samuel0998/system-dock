@@ -6,7 +6,7 @@ from api.upload import upload_bp
 from api.painel import painel_bp
 from api.dashboard import dashboard_bp
 from api.transferin import transferin_bp
-from api.auth import auth_bp, current_capabilities, current_role
+from api.auth import auth_bp, current_capabilities, current_role, refresh_session_role_from_db
 
 from db import init_db, db
 import models  # garante que os models sejam importados (Carga etc.)
@@ -74,7 +74,10 @@ def create_app() -> Flask:
             return None
 
         if session.get("auth_ok"):
-            return None
+            # Revalida perfil no banco a cada request para refletir mudanças de permissão em tempo real.
+            if refresh_session_role_from_db():
+                return None
+            session.clear()
 
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
         accepts_json = "application/json" in (request.headers.get("Accept") or "")
