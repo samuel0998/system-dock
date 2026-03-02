@@ -28,6 +28,11 @@
         <a href="/pc" class="nav-link {% if request.path.startswith('/pc') %}active{% endif %}">Painel</a>
         <a href="/transferin" class="nav-link {% if request.path.startswith('/transferin') %}active{% endif %}">TransferIn</a>
         <a href="/dashboard" class="nav-link {% if request.path.startswith('/dashboard') %}active{% endif %}">Dashboard</a>
+        {% if session.get('auth_ok') %}
+        <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline;">
+            <button type="submit" class="nav-link nav-link-logout">Sair ({{ session.get('operator_login') }})</button>
+        </form>
+        {% endif %}
     </nav>
 </header>
 
