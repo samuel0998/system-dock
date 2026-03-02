@@ -22,6 +22,23 @@ def _to_aware_utc(dt: datetime | None) -> datetime | None:
     return dt.astimezone(timezone.utc) if isinstance(dt, datetime) else None
 
 
+def _deadline_sla_por_expected(carga: Carga) -> datetime | None:
+    """
+    Regra operacional: a ofensa sempre é 4h após Expected Arrival Date,
+    inclusive quando a carga já avançou de ARRIVAL_SCHEDULED para ARRIVAL.
+    """
+    expected = _to_aware_utc(carga.expected_arrival_date)
+    if expected:
+        return expected + timedelta(hours=4)
+
+    # fallback defensivo para registros legados sem expected
+    arrived = _to_aware_utc(carga.arrived_at)
+    if arrived:
+        return arrived + timedelta(hours=4)
+
+    return None
+
+
 # =====================================================
 # Pages
 # =====================================================
@@ -60,28 +77,23 @@ def listar_cargas():
 
             tempo_sla_segundos = None
 
-            # ✅ SLA só existe em ARRIVAL (4h após clicar "CARGA CHEGOU")
-            if c.status == "arrival":
-                if c.sla_setar_aa_deadline is None:
-                    # fallback defensivo caso algum registro antigo esteja sem deadline
-                    base = c.arrived_at or agora
-                    c.arrived_at = c.arrived_at or base
-                    c.sla_setar_aa_deadline = base + timedelta(hours=4)
-                    mudou_algo = True
+            # ✅ Regra de SLA única:
+            # ARRIVAL e ARRIVAL_SCHEDULED ofendem em +4h do Expected Arrival Date.
+            if c.status in ("arrival", "arrival_scheduled"):
+                deadline = _deadline_sla_por_expected(c)
 
-                deadline = c.sla_setar_aa_deadline
-                if deadline and deadline.tzinfo is None:
-                    deadline = deadline.replace(tzinfo=timezone.utc)
+                if deadline:
+                    tempo_sla_segundos = int((deadline - agora).total_seconds())
 
-                tempo_sla_segundos = int((deadline - agora).total_seconds())
+                    # ✅ registrador de atraso persistente
+                    if tempo_sla_segundos < 0:
+                        atraso_atual = abs(tempo_sla_segundos)
+                        if (not c.atraso_registrado) or (atraso_atual > int(c.atraso_segundos or 0)):
+                            c.atraso_segundos = atraso_atual
+                            c.atraso_registrado = True
+                            mudou_algo = True
 
-                # ✅ registrador de atraso persistente (mesmo se depois setar AA)
-                if tempo_sla_segundos < 0:
-                    atraso_atual = abs(tempo_sla_segundos)
-                    if (not c.atraso_registrado) or (atraso_atual > int(c.atraso_segundos or 0)):
-                        c.atraso_segundos = atraso_atual
-                        c.atraso_registrado = True
-                        mudou_algo = True
+            start_time_utc = _to_aware_utc(c.start_time)
 
             lista.append({
                 "id": c.id,
@@ -90,12 +102,14 @@ def listar_cargas():
                 "truck_type": getattr(c, "truck_type", None),
                 "truck_tipo": getattr(c, "truck_tipo", None),
 
-                "expected_arrival_date": c.expected_arrival_date.isoformat() if c.expected_arrival_date else None,
+                "expected_arrival_date": expected.isoformat() if expected else None,
                 "status": c.status,
 
                 "units": int(c.units or 0),
                 "cartons": int(c.cartons or 0),
                 "aa_responsavel": c.aa_responsavel,
+                "start_time": start_time_utc.isoformat() if start_time_utc else None,
+                "tempo_total_segundos": int(c.tempo_total_segundos) if c.tempo_total_segundos is not None else None,
 
                 # ✅ tempo do SLA (front decide se mostra vermelho quando negativo)
                 "tempo_sla_segundos": tempo_sla_segundos,
@@ -103,6 +117,7 @@ def listar_cargas():
                 # ✅ atraso persistido
                 "atraso_segundos": int(c.atraso_segundos or 0),
                 "atraso_registrado": bool(c.atraso_registrado),
+                "atraso_comentario": c.atraso_comentario,
 
                 "priority_score": float(c.priority_score or 0),
             })
@@ -159,6 +174,14 @@ def finalizar(carga_id):
     carga.end_time = end_time
     carga.tempo_total_segundos = tempo_total_segundos
     carga.units_por_hora = units_por_hora
+
+    # Persistência da métrica: se ofendeu no fechamento, fica registrada para sempre.
+    deadline = _deadline_sla_por_expected(carga)
+    if deadline and end_time > deadline:
+        atraso_atual = int((end_time - deadline).total_seconds())
+        if (not carga.atraso_registrado) or (atraso_atual > int(carga.atraso_segundos or 0)):
+            carga.atraso_registrado = True
+            carga.atraso_segundos = atraso_atual
 
     db.session.commit()
     return jsonify({"message": "Carga finalizada"})
@@ -217,6 +240,28 @@ def carga_chegou(carga_id):
     except Exception:
         current_app.logger.exception("Erro em /pc/carga-chegou")
         return jsonify({"message": "Erro interno."}), 500
+
+
+@painel_bp.route("/comentar-atraso/<int:carga_id>", methods=["POST"])
+def comentar_atraso(carga_id):
+    data = request.get_json(silent=True) or {}
+    comentario = (data.get("comentario") or "").strip()
+
+    if not comentario:
+        return jsonify({"error": "Comentário é obrigatório"}), 400
+
+    carga = Carga.query.get(carga_id)
+    if not carga:
+        return jsonify({"error": "Carga não encontrada"}), 404
+
+    if carga.status not in ("arrival", "arrival_scheduled"):
+        return jsonify({"error": "Comentário só pode ser registrado para cargas em ARRIVAL/ARRIVAL_SCHEDULED"}), 400
+
+    carga.atraso_comentario = comentario
+    carga.atraso_comentado_em = datetime.now(timezone.utc)
+
+    db.session.commit()
+    return jsonify({"message": "Comentário de atraso salvo"}), 200
 
 
 # =====================================================
