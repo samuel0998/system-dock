@@ -545,7 +545,7 @@ function confirmarComentarioAtraso() {
 // =====================================================
 // 📅 FORMATAR DATA
 // =====================================================
-function formatarData(data) {
+  function formatarData(data) {
     if (!data) return "-";
     const d = new Date(data);
     if (isNaN(d)) return "-";
