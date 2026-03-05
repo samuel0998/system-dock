@@ -2,12 +2,13 @@
 // Versão limpa (sem funções duplicadas) + suporte a ARRIVAL_SCHEDULED + SLA 4h em ARRIVAL
 // Requisitos do backend (/pc/listar):
 // - status: "arrival_scheduled" | "arrival" | "checkin" | "closed" | "no_show" | "deleted"
-// - tempo_sla_segundos (number | null) para status arrival
+// - tempo_sla_segundos (number | null) para status arrival e arrival_scheduled (quando aplicável)
 // - start_time (ISO | null) para status checkin
 // - tempo_total_segundos (number | null) para status closed
 // - truck_tipo (string | null)
 
 document.addEventListener("DOMContentLoaded", () => {
+    setarFiltrosDataHoje();
     carregarCargas();
 
     // Se seus botões de filtro chamam via onclick no HTML, ok.
@@ -18,6 +19,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let timers = {};
 let cargasGlobais = [];
+
+function can(cap) {
+    return Boolean(window.AUTH_CAPS && window.AUTH_CAPS[cap]);
+}
 
 // =====================================================
 // 🔄 CARREGAR CARGAS
@@ -33,7 +38,7 @@ function carregarCargas() {
                 return;
             }
             cargasGlobais = data;
-            renderizarTabela(data);
+            aplicarFiltros();
         })
         .catch(err => {
             console.error("Erro ao carregar cargas:", err);
@@ -62,11 +67,12 @@ function renderizarTabela(cargas) {
     cargas.forEach(carga => {
 
         const tr = document.createElement("tr");
+        tr.id = `row-carga-${carga.id}`;
         const prioridade = calcularPrioridade(Number(carga.priority_score ?? 0));
 
-        // Linha vermelha quando ARRIVAL e SLA negativo
+        // Linha vermelha quando SLA negativo (ARRIVAL ou ARRIVAL_SCHEDULED após expected)
         if (
-            carga.status === "arrival" &&
+            (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
             typeof carga.tempo_sla_segundos === "number" &&
             carga.tempo_sla_segundos < 0
         ) {
@@ -74,7 +80,7 @@ function renderizarTabela(cargas) {
         }
 
         tr.innerHTML = `
-            <td>${carga.appointment_id ?? "-"}</td>
+            <td>${renderAppointmentLink(carga.appointment_id)}</td>
             <td>${carga.truck_tipo ?? "-"}</td>
             <td>${formatarData(carga.expected_arrival_date)}</td>
             <td>${Number(carga.units ?? 0)}</td>
@@ -90,15 +96,44 @@ function renderizarTabela(cargas) {
                 ${formatarTempoFinal(carga)}
             </td>
             <td>${renderizarBotaoAcao(carga)}</td>
+            <td>${renderizarComentarioAtraso(carga)}</td>
         `;
 
         tabela.appendChild(tr);
 
-        // Cronômetro apenas se estiver em checkin
+        // Cronômetro se estiver em checkin
         if (carga.status === "checkin" && carga.start_time) {
             iniciarCronometro(carga.id, carga.start_time);
         }
+
+        // Timer SLA em tempo real para arrival / arrival_scheduled
+        if (
+            (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
+            typeof carga.tempo_sla_segundos === "number"
+        ) {
+            iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
+        }
     });
+}
+
+function isCargaAtrasada(carga) {
+    return (
+        (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
+        typeof carga.tempo_sla_segundos === "number" &&
+        carga.tempo_sla_segundos < 0
+    );
+}
+
+function renderizarComentarioAtraso(carga) {
+    if (!can("painel_comment")) return "-";
+    if (!isCargaAtrasada(carga)) return "-";
+
+    const textoBotao = carga.atraso_comentario ? "Editar comentário" : "Comentar atraso";
+    const balao = carga.atraso_comentario
+        ? `<button class="btn-comentario-atraso" title="${escapeHtml(carga.atraso_comentario)}" onclick="mostrarComentarioExistente('${carga.id}')">💬</button>`
+        : "";
+
+    return `${balao}<button class="btn-comentario-atraso" onclick="abrirModalAtraso('${carga.id}')">${textoBotao}</button>`;
 }
 
 // =====================================================
@@ -112,18 +147,43 @@ function iniciarCronometro(id, startTimeISO) {
 
     timers[id] = setInterval(() => {
         const agora = new Date();
-        const diff = Math.floor((agora - start) / 1000);
+        // checkin é cronômetro crescente, nunca regressivo
+        const diff = Math.max(0, Math.floor((agora - start) / 1000));
         atualizarTempoTela(id, diff);
     }, 1000);
 }
 
 function atualizarTempoTela(id, totalSegundos) {
-    const horas = String(Math.floor(totalSegundos / 3600)).padStart(2, "0");
-    const minutos = String(Math.floor((totalSegundos % 3600) / 60)).padStart(2, "0");
-    const segundos = String(totalSegundos % 60).padStart(2, "0");
+    const t = Math.max(0, Number(totalSegundos || 0));
+    const horas = String(Math.floor(t / 3600)).padStart(2, "0");
+    const minutos = String(Math.floor((t % 3600) / 60)).padStart(2, "0");
+    const segundos = String(t % 60).padStart(2, "0");
 
     const el = document.getElementById(`timer-${id}`);
     if (el) el.innerText = `${horas}:${minutos}:${segundos}`;
+}
+
+function iniciarTimerSLA(id, tempoInicialSegundos, status) {
+    const el = document.getElementById(`timer-${id}`);
+    if (!el) return;
+
+    const rowEl = document.getElementById(`row-carga-${id}`);
+
+    let restante = Number(tempoInicialSegundos);
+    el.innerText = formatarTempoSLA(restante);
+
+    if (rowEl && (status === "arrival" || status === "arrival_scheduled")) {
+        rowEl.classList.toggle("linha-atrasada", restante < 0);
+    }
+
+    timers[`sla-${id}`] = setInterval(() => {
+        restante -= 1;
+        el.innerText = formatarTempoSLA(restante);
+
+        if (rowEl && (status === "arrival" || status === "arrival_scheduled")) {
+            rowEl.classList.toggle("linha-atrasada", restante < 0);
+        }
+    }, 1000);
 }
 
 // =====================================================
@@ -141,12 +201,12 @@ function formatarTempoFinal(carga) {
         return "00:00:00";
     }
 
-    // ARRIVAL -> SLA 4h vindo do backend (tempo_sla_segundos)
-    if (carga.status === "arrival") {
+    // ARRIVAL / ARRIVAL_SCHEDULED -> SLA vindo do backend (tempo_sla_segundos)
+    // Em ARRIVAL_SCHEDULED o backend só preenche após passar do expected.
+    if (carga.status === "arrival" || carga.status === "arrival_scheduled") {
         return formatarTempoSLA(carga.tempo_sla_segundos);
     }
 
-    // ARRIVAL_SCHEDULED -> sem SLA
     return "-";
 }
 
@@ -176,36 +236,87 @@ function formatarSegundos(total) {
 // 🔘 AÇÕES / BOTÕES
 // =====================================================
 function renderizarBotaoAcao(carga) {
+    const expertBtn = can("expert_manage")
+        ? `<button class="btn-comentario-atraso" onclick="expertGerenciarCarga('${carga.id}')">Expert</button>`
+        : "";
 
     // ARRIVAL_SCHEDULED -> botão CARGA CHEGOU (vira ARRIVAL e inicia SLA)
     if (carga.status === "arrival_scheduled") {
         return `
-            <button class="btn-acao" onclick="cargaChegou('${carga.id}')">CARGA CHEGOU</button>
-            <button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>
+            ${can("painel_carga_chegou") ? `<button class="btn-acao" onclick="cargaChegou('${carga.id}')">CARGA CHEGOU</button>` : "-"}
+            ${can("painel_delete") ? `<button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>` : ""}
+            ${expertBtn}
         `;
     }
 
     // ARRIVAL -> botão Setar AA
     if (carga.status === "arrival") {
         return `
-            <button class="btn-acao" onclick="abrirModalAA('${carga.id}')">Setar AA</button>
-            <button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>
+            ${can("painel_set_aa") ? `<button class="btn-acao" onclick="abrirModalAA('${carga.id}')">Setar AA</button>` : "-"}
+            ${can("painel_delete") ? `<button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>` : ""}
+            ${expertBtn}
         `;
     }
 
     // CHECKIN -> Finalizar
     if (carga.status === "checkin") {
         return `
-            <button class="btn-acao" onclick="finalizar('${carga.id}')">Finalizar</button>
-            <button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>
+            ${can("painel_finalize") ? `<button class="btn-acao" onclick="finalizar('${carga.id}')">Finalizar</button>` : "-"}
+            ${can("painel_delete") ? `<button class="btn-delete" onclick="abrirModalDelete('${carga.id}')">Deletar</button>` : ""}
+            ${expertBtn}
         `;
     }
 
-    if (carga.status === "closed") return "Concluída";
+    if (carga.status === "closed") return `Concluída ${expertBtn}`;
     if (carga.status === "no_show") return `<span class="status-no-show">No Show</span>`;
     if (carga.status === "deleted") return `<span class="status-deleted">Deletada</span>`;
 
     return "-";
+}
+
+function expertGerenciarCarga(cargaId) {
+    if (!can("expert_manage")) return;
+
+    const acao = prompt("EXPERT: digite 'delete' para apagar do banco, ou 'edit' para editar campos.");
+    if (!acao) return;
+
+    if (acao.toLowerCase() === "delete") {
+        if (!confirm("Confirma hard delete desta carga no banco?")) return;
+        fetch(`/pc/expert/manage/${cargaId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "hard_delete" })
+        })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp?.error) return alert(resp.error);
+                carregarCargas();
+            });
+        return;
+    }
+
+    if (acao.toLowerCase() === "edit") {
+        const raw = prompt("Cole JSON de atualização. Ex: {\"status\":\"arrival\",\"units\":120}");
+        if (!raw) return;
+        let updates;
+        try {
+            updates = JSON.parse(raw);
+        } catch {
+            alert("JSON inválido.");
+            return;
+        }
+
+        fetch(`/pc/expert/manage/${cargaId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "edit", updates })
+        })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp?.error) return alert(resp.error);
+                carregarCargas();
+            });
+    }
 }
 
 // ARRIVAL_SCHEDULED -> ARRIVAL
@@ -376,13 +487,107 @@ function confirmarDelete() {
         });
 }
 
+let cargaAtrasoSelecionada = null;
+
+function abrirModalAtraso(cargaId) {
+    cargaAtrasoSelecionada = cargaId;
+
+    const modal = document.getElementById("modalAtraso");
+    const textarea = document.getElementById("comentarioAtraso");
+    const carga = cargasGlobais.find(c => String(c.id) === String(cargaId));
+
+    if (!modal || !textarea) return;
+
+    textarea.value = carga?.atraso_comentario || "";
+    modal.style.display = "flex";
+}
+
+function fecharModalAtraso() {
+    cargaAtrasoSelecionada = null;
+    const modal = document.getElementById("modalAtraso");
+    if (modal) modal.style.display = "none";
+}
+
+function mostrarComentarioExistente(cargaId) {
+    const carga = cargasGlobais.find(c => String(c.id) === String(cargaId));
+    alert(carga?.atraso_comentario || "Sem comentário registrado.");
+}
+
+function confirmarComentarioAtraso() {
+    const textarea = document.getElementById("comentarioAtraso");
+    const comentario = (textarea?.value || "").trim();
+
+    if (!comentario) {
+        alert("Digite o comentário do atraso.");
+        return;
+    }
+
+    fetch(`/pc/comentar-atraso/${cargaAtrasoSelecionada}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comentario })
+    })
+        .then(res => res.json())
+        .then(resp => {
+            if (resp?.error) {
+                alert(resp.error);
+                return;
+            }
+            fecharModalAtraso();
+            carregarCargas();
+        })
+        .catch(err => {
+            console.error("Erro ao salvar comentário:", err);
+            alert("Erro ao salvar comentário de atraso.");
+        });
+}
+
 // =====================================================
 // 📅 FORMATAR DATA
 // =====================================================
 function formatarData(data) {
     if (!data) return "-";
     const d = new Date(data);
-    return isNaN(d) ? "-" : d.toLocaleString("pt-BR");
+    if (isNaN(d)) return "-";
+
+    return d.toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        hour12: false
+    });
+}
+
+function escapeHtml(texto) {
+    return String(texto ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function renderAppointmentLink(appointmentId) {
+    const id = (appointmentId ?? "").toString().trim();
+    if (!id) return "-";
+
+    const href = `https://dockmaster.na.aftx.amazonoperations.app/pt_BR/#/dockmaster/appointment/GIG2/view/${encodeURIComponent(id)}/appointmentDetail`;
+    return `<a class="appointment-link" href="${href}" target="_blank" rel="noopener noreferrer">${id}</a>`;
+}
+
+function dataParaComparacao(data) {
+    // Converte para YYYY-MM-DD no fuso da operação (BRT)
+    const partes = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Sao_Paulo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).formatToParts(data);
+
+    const y = partes.find(p => p.type === "year")?.value;
+    const m = partes.find(p => p.type === "month")?.value;
+    const d = partes.find(p => p.type === "day")?.value;
+
+    if (!y || !m || !d) return "";
+    return `${y}-${m}-${d}`;
 }
 
 // =====================================================
@@ -426,7 +631,7 @@ function aplicarFiltros() {
             const dataCarga = new Date(carga.expected_arrival_date);
             if (isNaN(dataCarga)) return false;
 
-            const dataString = dataCarga.toISOString().split("T")[0];
+            const dataString = dataParaComparacao(dataCarga);
             if (dataInicio && dataString < dataInicio) return false;
             if (dataFim && dataString > dataFim) return false;
         }
@@ -449,15 +654,28 @@ function limparFiltros() {
     const appointment = document.getElementById("filtroAppointment");
     const select = document.getElementById("filtroStatus");
 
-    if (dataInicio) dataInicio.value = "";
-    if (dataFim) dataFim.value = "";
+    setarFiltrosDataHoje();
     if (appointment) appointment.value = "";
 
     if (select) {
         Array.from(select.options).forEach(option => option.selected = false);
     }
 
-    renderizarTabela(cargasGlobais);
+    aplicarFiltros();
+}
+
+function setarFiltrosDataHoje() {
+    const hoje = new Date();
+    const y = hoje.getFullYear();
+    const m = String(hoje.getMonth() + 1).padStart(2, "0");
+    const d = String(hoje.getDate()).padStart(2, "0");
+    const valor = `${y}-${m}-${d}`;
+
+    const dataInicio = document.getElementById("filtroDataInicio");
+    const dataFim = document.getElementById("filtroDataFim");
+
+    if (dataInicio) dataInicio.value = valor;
+    if (dataFim) dataFim.value = valor;
 }
 
 // =====================================================
