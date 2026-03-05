@@ -116,6 +116,14 @@ function renderizarTabela(cargas) {
         ) {
             iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
         }
+
+        // Timer SLA em tempo real para arrival / arrival_scheduled
+        if (
+            (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
+            typeof carga.tempo_sla_segundos === "number"
+        ) {
+            iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
+        }
     });
 }
 
@@ -556,7 +564,7 @@ function confirmarComentarioAtraso() {
 // =====================================================
 // 📅 FORMATAR DATA
 // =====================================================
-function formatarData(data) {
+  function formatarData(data) {
     if (!data) return "-";
     const d = new Date(data);
     if (isNaN(d)) return "-";
