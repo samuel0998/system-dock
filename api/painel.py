@@ -25,8 +25,9 @@ def _to_aware_utc(dt: datetime | None) -> datetime | None:
     if not dt:
         return None
     if isinstance(dt, datetime) and dt.tzinfo is None:
-        # Datas sem TZ vindas do banco/form são do horário local da operação.
-        return dt.replace(tzinfo=LOCAL_TZ).astimezone(timezone.utc)
+        # O banco persiste timestamps em UTC (sem tzinfo em alguns drivers).
+        # Portanto, datetime naive deve ser interpretado como UTC.
+        return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc) if isinstance(dt, datetime) else None
 
 

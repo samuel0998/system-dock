@@ -62,7 +62,9 @@ def dashboard_stats():
         if not dt:
             return None
         if getattr(dt, "tzinfo", None) is None:
-            return dt.replace(tzinfo=LOCAL_TZ).astimezone(timezone.utc)
+            # No banco, timestamps podem voltar como naive mesmo estando em UTC.
+            # Tratar naive como UTC evita adicionar +3h indevidos no SLA.
+            return dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc)
 
     def _deadline_sla(c):
