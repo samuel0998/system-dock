@@ -4,12 +4,19 @@
 
 <div class="container">
 
-    <h2 class="titulo-pagina">Painel de Controle</h2>
+    <div class="painel-header">
+        <h2 class="titulo-pagina">Painel de Controle</h2>
+        <p class="painel-subtitulo">Acompanhe cargas em tempo real, filtre rapidamente e execute ações operacionais.</p>
+    </div>
 
     <!-- ========================= -->
     <!-- 🔎 FILTROS -->
     <!-- ========================= -->
-    <div class="filtro-container">
+    <div class="filtro-container filtro-container-moderno">
+        <div class="filtro-header">
+            <h3>Filtros Inteligentes</h3>
+            <span>Você pode combinar status, data e Appointment ID</span>
+        </div>
 
         <div class="filtro-grupo">
             <label>Data Inicial</label>
@@ -28,29 +35,29 @@
                 <option value="checkin">Checkin</option>
                 <option value="closed">Concluídas</option>
                 <option value="no_show">No Show</option>
+                <option value="arrival_scheduled">Arrival Scheduled</option>
             </select>
         </div>
 
         <div class="filtro-grupo">
             <label>Buscar Appointment ID</label>
-            <input type="text" id="filtroAppointment" placeholder="Digite o ID">
+            <input type="text" id="filtroAppointment" placeholder="Ex.: 92003056969">
         </div>
 
         <div class="filtro-botoes">
-            <button onclick="aplicarFiltros()" class="btn-filtrar">Filtrar</button>
-            <button onclick="limparFiltros()" class="btn-limpar">Limpar</button>
+            <button onclick="aplicarFiltros()" class="btn-filtrar">Aplicar Filtros</button>
+            <button onclick="limparFiltros()" class="btn-limpar">Limpar Tudo</button>
+            {% if auth_caps.get('painel_set_aa') %}
+            <button onclick="abrirModalAdicionarCarga()" class="btn-filtrar">+ Carga</button>
+            {% endif %}
         </div>
     </div>
-
-
-
-</div>
 
 
     <!-- ========================= -->
     <!-- 📋 TABELA -->
     <!-- ========================= -->
-    <div class="tabela-container">
+    <div class="tabela-container tabela-container-moderna">
 
         <table class="tabela-cargas">
 
@@ -64,9 +71,10 @@
                     <th>Status</th>
                     <th>AA</th>
                     <th>Priority</th>
-                    <th>Tempo</th>
+                    <th>Tempo Produtivo</th>
+                    <th>Tempo SLA</th>
                     <th>Ação</th>
-                    
+                    <th>Comentário Atraso</th>
                 </tr>
             </thead>
 
@@ -123,6 +131,87 @@
             <button onclick="fecharModalAA()" class="btn-cancel">
                 Cancelar
             </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========================= -->
+<!-- 💬 MODAL COMENTAR ATRASO -->
+<!-- ========================= -->
+<div id="modalAtraso" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h3>Comentar Atraso</h3>
+
+        <textarea id="comentarioAtraso"
+                  placeholder="Descreva o motivo do atraso..."
+                  rows="4"></textarea>
+
+        <div class="modal-actions">
+            <button onclick="confirmarComentarioAtraso()" class="btn-confirm">
+                Salvar
+            </button>
+
+            <button onclick="fecharModalAtraso()" class="btn-cancel">
+                Cancelar
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========================= -->
+<!-- ➕ MODAL ADICIONAR CARGA -->
+<!-- ========================= -->
+<div id="modalAdicionarCarga" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h3>Adicionar Carga</h3>
+
+        <input type="text" id="addAppointmentId" placeholder="Appointment ID">
+        <input type="datetime-local" id="addExpectedArrivalDate">
+        <select id="addStatus">
+            <option value="arrival_scheduled">arrival_scheduled</option>
+            <option value="arrival">arrival</option>
+            <option value="checkin">checkin</option>
+        </select>
+        <input type="number" id="addUnits" placeholder="Units" min="0">
+        <input type="number" id="addCartons" placeholder="Cartons" min="0">
+        <input type="text" id="addTruckTipo" placeholder="Truck Tipo (ex: VDD)">
+        <input type="text" id="addTruckType" placeholder="Truck Type (ex: OTHER)">
+
+        <div class="modal-actions">
+            <button onclick="confirmarAdicionarCarga()" class="btn-confirm">Salvar</button>
+            <button onclick="fecharModalAdicionarCarga()" class="btn-cancel">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= -->
+<!-- 🛠 MODAL EXPERT CARGA -->
+<!-- ========================= -->
+<div id="modalExpertCarga" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h3>Editar Carga (EXPERT)</h3>
+
+        <input type="text" id="expertAppointmentId" placeholder="Appointment ID">
+        <select id="expertStatus">
+            <option value="arrival_scheduled">arrival_scheduled</option>
+            <option value="arrival">arrival</option>
+            <option value="checkin">checkin</option>
+            <option value="closed">closed</option>
+            <option value="no_show">no_show</option>
+            <option value="deleted">deleted</option>
+        </select>
+        <input type="number" id="expertUnits" placeholder="Units" min="0">
+        <input type="number" id="expertCartons" placeholder="Cartons" min="0">
+        <input type="text" id="expertAA" placeholder="AA Responsável">
+        <input type="text" id="expertTruckTipo" placeholder="Truck Tipo">
+        <input type="text" id="expertTruckType" placeholder="Truck Type">
+
+        <div class="modal-actions">
+            <button onclick="salvarEdicaoExpert()" class="btn-confirm">Salvar edição</button>
+            <button onclick="deletarHardExpert()" class="btn-delete">Deletar definitivo</button>
+            <button onclick="fecharModalExpertCarga()" class="btn-cancel">Cancelar</button>
         </div>
     </div>
 </div>

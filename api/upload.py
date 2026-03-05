@@ -1,29 +1,33 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, current_app
 import pandas as pd
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from db import db
 from models import Carga
+from api.auth import require_capability
 
 upload_bp = Blueprint("upload", __name__, url_prefix="/upload")
 
+try:
+    LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
+except Exception:
+    LOCAL_TZ = timezone(timedelta(hours=-3))
+
 
 @upload_bp.route("/")
+@require_capability("upload")
 def upload_page():
     return render_template("upload.html")
 
 
 def _get_col(row, *names, default=None):
-    """
-    Pega a primeira coluna existente (case insensitive) dentre as opções.
-    Ex: _get_col(row, "Units", "UNITS", "units")
-    """
-    # tenta match direto (como veio no excel)
+    # tenta match direto
     for n in names:
         if n in row and pd.notna(row.get(n)):
             return row.get(n)
 
-    # tenta match case-insensitive (pandas às vezes muda nomes)
+    # tenta case-insensitive
     row_keys_lower = {str(k).strip().lower(): k for k in row.index}
     for n in names:
         key = row_keys_lower.get(str(n).strip().lower())
@@ -47,8 +51,6 @@ def _normalize_type(raw):
         return None, None
 
     up = s.upper()
-
-    # normaliza erros comuns
     up = (
         up.replace("TRASNSSHIP", "TRANSSHIP")
           .replace("TRANS SHIP", "TRANSSHIP")
@@ -60,140 +62,227 @@ def _normalize_type(raw):
     if up == "TRANSSHIP":
         return up, "Transferência"
 
-    # desconhecido: salva raw e deixa tipo normalizado vazio
     return up, None
 
 
 def _to_utc_aware(dt):
-    """
-    Converte datetime do pandas em datetime aware UTC.
-    Se vier naive, assume UTC.
-    """
     if dt is None or pd.isna(dt):
         return None
+
+    raw = str(dt).strip() if isinstance(dt, str) else None
+
     try:
-        d = pd.to_datetime(dt, errors="coerce")
+        # pandas não reconhece bem "BRT" e pode descartar tz; tratamos manualmente.
+        if raw and raw.upper().endswith("BRT"):
+            sem_tz = raw[:-3].strip()
+            d = pd.to_datetime(sem_tz, errors="coerce")
+        else:
+            d = pd.to_datetime(dt, errors="coerce")
     except Exception:
         return None
 
     if pd.isna(d):
         return None
 
-    # se vier tz-aware, converte pra UTC
-    if getattr(d, "tzinfo", None) is not None:
-        try:
-            d = d.tz_convert("UTC")
-        except Exception:
-            # algumas strings tz quebradas: remove tz e assume UTC
-            d = d.tz_localize(None)
-
     py = d.to_pydatetime()
 
-    # garante tzinfo UTC
     if py.tzinfo is None:
-        py = py.replace(tzinfo=timezone.utc)
-    else:
-        py = py.astimezone(timezone.utc)
+        # Datas vindas da planilha sem tz explícita são horário local da operação (BRT).
+        py = py.replace(tzinfo=LOCAL_TZ)
 
-    return py
+    return py.astimezone(timezone.utc)
+
+
+def _status_do_sistema(plan_status_raw: object) -> str | None:
+    """
+    LÓGICA DO SISTEMA (não copia status livremente)
+    - ARRIVAL_SCHEDULED -> arrival_scheduled
+    - CLOSED/DELETED -> None (ignora)
+    - qualquer outro -> arrival
+    """
+    if plan_status_raw is None or (isinstance(plan_status_raw, float) and pd.isna(plan_status_raw)):
+        return "arrival"
+
+    s = str(plan_status_raw).strip().upper()
+    if not s:
+        return "arrival"
+
+    # normaliza
+    s = s.replace("ARRIVED", "ARRIVAL")
+
+    if s == "ARRIVAL_SCHEDULED":
+        return "arrival_scheduled"
+    if s in ("CLOSED", "DELETED"):
+        return None
+
+    return "arrival"
 
 
 @upload_bp.route("/processar", methods=["POST"])
+@require_capability("upload")
 def processar_planilha():
     file = request.files.get("file")
     if not file:
-        return jsonify({"message": "Nenhum arquivo enviado."}), 400
+        return jsonify({"message": "Nenhum arquivo enviado.", "inseridas": 0, "atualizadas": 0, "ignoradas": 0, "erros": []}), 400
 
     try:
         df = pd.read_excel(file)
     except Exception as e:
-        return jsonify({"message": f"Erro ao ler arquivo Excel: {str(e)}"}), 400
+        return jsonify({"message": f"Erro ao ler arquivo Excel: {str(e)}", "inseridas": 0, "atualizadas": 0, "ignoradas": 0, "erros": []}), 400
 
     inseridas = 0
+    atualizadas = 0
     ignoradas = 0
-    objetos = []
+    repetidas_no_arquivo = 0
+    erros: list[str] = []
+
     agora = datetime.now(timezone.utc)
 
-    for _, row in df.iterrows():
+    seen_appointments: set[str] = set()
 
-        # Appointment ID (coluna A)
-        appointment_id = row.iloc[0] if len(row) > 0 else None
-        if pd.isna(appointment_id):
-            ignoradas += 1
-            continue
-
-        # Type (coluna B)
-        type_raw = row.iloc[1] if len(row) > 1 else None
-        truck_type, truck_tipo = _normalize_type(type_raw)
-
-        # Units
-        units_raw = _get_col(row, "Units", "UNITS", "units", default=0)
+    for idx, row in df.iterrows():
         try:
-            if pd.isna(units_raw) or float(units_raw) == 0:
+            # A = Appointment ID | B = Type (garante mesmo se header mudar)
+            appointment_id = row.iloc[0] if len(row) > 0 else None
+            if appointment_id is None or pd.isna(appointment_id):
                 ignoradas += 1
                 continue
-            units = int(float(units_raw))
-        except Exception:
+
+            appointment_str = str(appointment_id).strip()
+            if not appointment_str:
+                ignoradas += 1
+                continue
+
+            if appointment_str in seen_appointments:
+                repetidas_no_arquivo += 1
+            else:
+                seen_appointments.add(appointment_str)
+
+            type_raw = row.iloc[1] if len(row) > 1 else None
+            truck_type, truck_tipo = _normalize_type(type_raw)
+
+            # Datas
+            expected_arrival = _to_utc_aware(_get_col(row, "Expected Arrival Date", default=None))
+            priority_last_update = _to_utc_aware(_get_col(row, "Priority Score Last Updated Date", default=None))
+
+            # sem expected_arrival não dá pra SLA / no_show
+            if not expected_arrival:
+                ignoradas += 1
+                continue
+
+            # Units / Cartons
+            units_raw = _get_col(row, "Units", "UNITS", "units", default=0)
+            cartons_raw = _get_col(row, "Cartons", "CARTONS", "cartons", default=0)
+
+            try:
+                units_val = 0 if pd.isna(units_raw) else int(float(units_raw))
+            except Exception:
+                units_val = 0
+
+            try:
+                cartons_val = 0 if pd.isna(cartons_raw) else int(float(cartons_raw))
+            except Exception:
+                cartons_val = 0
+
+            # regra de negócio: cargas com units <= 0 são ignoradas
+            if units_val <= 0:
+                ignoradas += 1
+                continue
+
+            # Priority score
+            priority_score_raw = _get_col(row, "Priority Score", default=0) or 0
+            try:
+                priority_score = float(priority_score_raw)
+            except Exception:
+                priority_score = 0.0
+
+            # STATUS (lógica do sistema)
+            plan_status = _get_col(row, "Status", "STATUS", default=None)
+            status = _status_do_sistema(plan_status)
+
+            # CLOSED/DELETED -> ignorar
+            if status is None:
+                ignoradas += 1
+                continue
+
+            # regra: arrival_scheduled passou 24h -> no_show
+            if status == "arrival_scheduled":
+                if agora > (expected_arrival + timedelta(hours=24)):
+                    status = "no_show"
+
+            prioridade_maxima = False
+            if priority_last_update:
+                prioridade_maxima = priority_last_update < expected_arrival
+
+            # UPSERT por appointment_id
+            carga = Carga.query.filter_by(appointment_id=appointment_str).first()
+            if carga:
+                carga.expected_arrival_date = expected_arrival
+                carga.priority_last_update = priority_last_update
+                carga.priority_score = priority_score
+                carga.prioridade_maxima = prioridade_maxima
+
+                # ✅ não sobrescreve checkin/closed se já estiver rodando
+                if carga.status not in ("checkin", "closed"):
+                    carga.status = status
+
+                carga.cartons = cartons_val
+                carga.units = units_val
+                carga.truck_type = truck_type
+                carga.truck_tipo = truck_tipo
+
+                atualizadas += 1
+            else:
+                carga = Carga(
+                    appointment_id=appointment_str,
+                    expected_arrival_date=expected_arrival,
+                    priority_last_update=priority_last_update,
+                    priority_score=priority_score,
+                    prioridade_maxima=prioridade_maxima,
+                    status=status,
+                    cartons=cartons_val,
+                    units=units_val,
+                    truck_type=truck_type,
+                    truck_tipo=truck_tipo,
+                    created_at=agora,
+
+                    aa_responsavel=None,
+                    start_time=None,
+                    end_time=None,
+                    tempo_total_segundos=None,
+                    units_por_hora=None,
+
+                    arrived_at=None,
+                    sla_setar_aa_deadline=None,
+                    atraso_registrado=False,
+                    atraso_segundos=0,
+                )
+                db.session.add(carga)
+                inseridas += 1
+
+        except Exception as e:
             ignoradas += 1
-            continue
+            erros.append(f"Linha {idx+2}: {str(e)}")
 
-        # Datas
-        expected_arrival = _to_utc_aware(_get_col(row, "Expected Arrival Date", default=None))
-        priority_last_update = _to_utc_aware(_get_col(row, "Priority Score Last Updated Date", default=None))
-
-        if not expected_arrival or not priority_last_update:
-            ignoradas += 1
-            continue
-
-        # Outros campos
-        priority_score_raw = _get_col(row, "Priority Score", default=0) or 0
-        cartons_raw = _get_col(row, "Cartons", default=0) or 0
-
-        try:
-            priority_score = float(priority_score_raw)
-        except Exception:
-            priority_score = 0.0
-
-        try:
-            cartons = int(float(cartons_raw))
-        except Exception:
-            cartons = 0
-
-        prioridade_maxima = priority_last_update < expected_arrival
-
-        objetos.append(
-            Carga(
-                appointment_id=str(appointment_id),
-                expected_arrival_date=expected_arrival,
-                priority_score=priority_score,
-                priority_last_update=priority_last_update,
-                status="arrival",
-                cartons=cartons,
-                units=units,
-
-                # ✅ NOVO
-                truck_type=truck_type,
-                truck_tipo=truck_tipo,
-
-                aa_responsavel=None,
-                start_time=None,
-                end_time=None,
-                tempo_total_segundos=None,
-                units_por_hora=None,
-                prioridade_maxima=prioridade_maxima,
-                created_at=agora,
-            )
-        )
-        inseridas += 1
-
-    if objetos:
-        db.session.bulk_save_objects(objetos)
+    try:
         db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception("Erro ao salvar upload")
+        return jsonify({
+            "message": f"Erro ao salvar no banco: {str(e)}",
+            "inseridas": 0,
+            "atualizadas": 0,
+            "ignoradas": int(len(df)),
+            "erros": erros[:30],
+        }), 500
 
-    return jsonify(
-        {
-            "message": "Upload concluído com sucesso!",
-            "inseridas": inseridas,
-            "ignoradas": ignoradas,
-        }
-    )
+    return jsonify({
+        "message": "Upload concluído com sucesso!",
+        "inseridas": inseridas,
+        "atualizadas": atualizadas,
+        "ignoradas": ignoradas,
+        "repetidas_no_arquivo": repetidas_no_arquivo,
+        "observacao": "Quando o mesmo Appointment ID aparece mais de uma vez, o sistema atualiza o registro já existente em vez de criar uma nova carga.",
+        "erros": erros[:30],
+    }), 200
