@@ -178,12 +178,12 @@ def dashboard_stats():
     ) or 0
 
     # ==========================
-    # ARRIVAL (pendentes) por created_at
+    # ARRIVAL + ARRIVAL_SCHEDULED (pendentes) por created_at
     # ==========================
     total_notas_pendentes = (
         db.session.query(func.count(Carga.id))
         .filter(
-            Carga.status == "arrival",
+            Carga.status.in_(["arrival", "arrival_scheduled"]),
             Carga.created_at >= inicio,
             Carga.created_at <= fim
         )
