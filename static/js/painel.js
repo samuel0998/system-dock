@@ -24,16 +24,14 @@ function can(cap) {
     return Boolean(window.AUTH_CAPS && window.AUTH_CAPS[cap]);
 }
 
-<<<<<<< HEAD
 function getCargaById(cargaId) {
     return cargasGlobais.find(c => String(c.id) === String(cargaId)) || null;
 }
 
-=======
->>>>>>> main
 // =====================================================
 // 🔄 CARREGAR CARGAS
 // =====================================================
+
 function carregarCargas() {
     fetch("/pc/listar")
         .then(res => res.json())
@@ -122,17 +120,6 @@ function renderizarTabela(cargas) {
             typeof carga.tempo_sla_segundos === "number"
         ) {
             iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
-<<<<<<< HEAD
-=======
-        }
-
-        // Timer SLA em tempo real para arrival / arrival_scheduled
-        if (
-            (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
-            typeof carga.tempo_sla_segundos === "number"
-        ) {
-            iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
->>>>>>> main
         }
     });
 }
@@ -157,9 +144,11 @@ function renderizarComentarioAtraso(carga) {
     return `${balao}<button class="btn-comentario-atraso" onclick="abrirModalAtraso('${carga.id}')">${textoBotao}</button>`;
 }
 
-// =====================================================
+// 
+
+
 // ⏱ CRONÔMETRO (CHECKIN)
-// =====================================================
+// 
 function iniciarCronometroProdutivo(id, startTimeISO) {
     const start = new Date(startTimeISO);
 
@@ -209,9 +198,9 @@ function iniciarTimerSLA(id, tempoInicialSegundos, status) {
     }, 1000);
 }
 
-// =====================================================
+// 
 // 🎯 TEMPO (ARRIVAL SLA / CHECKIN / CLOSED)
-// =====================================================
+// 
 function formatarTempoProdutivo(carga) {
     // CLOSED -> tempo total produtivo consolidado
     if (carga.status === "closed" && typeof carga.tempo_total_segundos === "number") {
@@ -261,9 +250,9 @@ function formatarSegundos(total) {
     return `${horas}:${minutos}:${segundos}`;
 }
 
-// =====================================================
+// 
 // 🔘 AÇÕES / BOTÕES
-// =====================================================
+// 
 function renderizarBotaoAcao(carga) {
     const expertBtn = can("expert_manage")
         ? `<button class="btn-comentario-atraso" onclick="expertGerenciarCarga('${carga.id}')">Expert</button>`
@@ -303,7 +292,6 @@ function renderizarBotaoAcao(carga) {
     return "-";
 }
 
-<<<<<<< HEAD
 let expertCargaSelecionada = null;
 
 function expertGerenciarCarga(cargaId) {
@@ -378,7 +366,7 @@ function deletarHardExpert() {
 }
 
 
-=======
+
 function expertGerenciarCarga(cargaId) {
     if (!can("expert_manage")) return;
 
@@ -424,7 +412,7 @@ function expertGerenciarCarga(cargaId) {
     }
 }
 
->>>>>>> main
+
 // ARRIVAL_SCHEDULED -> ARRIVAL
 function cargaChegou(cargaId) {
     fetch(`/pc/carga-chegou/${cargaId}`, { method: "POST" })
@@ -793,7 +781,6 @@ function calcularPrioridade(score) {
     return { label: "Baixa", classe: "prio-baixa" };
 }
 
-<<<<<<< HEAD
 
 // =====================================================
 // ➕ ADICIONAR CARGA (LC5+)
@@ -833,8 +820,7 @@ function confirmarAdicionarCarga() {
         })
         .catch(() => alert("Erro ao adicionar carga."));
 }
-=======
->>>>>>> main
+
 
 // =====================================================
 // 📄 EOS (se existir no seu DOM)
