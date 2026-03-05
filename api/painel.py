@@ -1,6 +1,7 @@
 # /app/api/painel.py
 from flask import Blueprint, jsonify, request, render_template, current_app
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
@@ -9,6 +10,11 @@ from models import Carga  # Operador pode ficar no models, mas aqui vamos consul
 from api.auth import require_capability
 
 painel_bp = Blueprint("painel", __name__, url_prefix="/pc")
+
+try:
+    LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
+except Exception:
+    LOCAL_TZ = timezone(timedelta(hours=-3))
 
 
 # =====================================================
@@ -19,7 +25,8 @@ def _to_aware_utc(dt: datetime | None) -> datetime | None:
     if not dt:
         return None
     if isinstance(dt, datetime) and dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        # Datas sem TZ vindas do banco/form são do horário local da operação.
+        return dt.replace(tzinfo=LOCAL_TZ).astimezone(timezone.utc)
     return dt.astimezone(timezone.utc) if isinstance(dt, datetime) else None
 
 
@@ -162,7 +169,7 @@ def adicionar_carga():
         return jsonify({"error": "Expected Arrival Date inválida"}), 400
 
     if expected_dt.tzinfo is None:
-        expected_dt = expected_dt.replace(tzinfo=timezone.utc)
+        expected_dt = expected_dt.replace(tzinfo=LOCAL_TZ)
 
     existente = Carga.query.filter_by(appointment_id=appointment_id).first()
     if existente:

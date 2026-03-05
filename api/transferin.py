@@ -22,7 +22,7 @@ def _to_aware_utc(dt):
     if not dt:
         return None
     if getattr(dt, "tzinfo", None) is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=LOCAL_TZ).astimezone(timezone.utc)
     return dt.astimezone(timezone.utc)
 
 
