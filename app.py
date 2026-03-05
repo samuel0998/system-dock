@@ -53,7 +53,7 @@ def create_app() -> Flask:
             return None
 
         if session.get("auth_ok"):
-            # Revalida perfil no banco a cada request para refletir mudanças de permissão em tempo real.
+            # Revalida perfil  banco a cada request para refletir mudanças de permissão em tempo real.
             if refresh_session_role_from_db():
                 return None
             session.clear()
