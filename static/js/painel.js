@@ -24,6 +24,13 @@ function can(cap) {
     return Boolean(window.AUTH_CAPS && window.AUTH_CAPS[cap]);
 }
 
+<<<<<<< HEAD
+function getCargaById(cargaId) {
+    return cargasGlobais.find(c => String(c.id) === String(cargaId)) || null;
+}
+
+=======
+>>>>>>> main
 // =====================================================
 // 🔄 CARREGAR CARGAS
 // =====================================================
@@ -115,6 +122,8 @@ function renderizarTabela(cargas) {
             typeof carga.tempo_sla_segundos === "number"
         ) {
             iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
+<<<<<<< HEAD
+=======
         }
 
         // Timer SLA em tempo real para arrival / arrival_scheduled
@@ -123,6 +132,7 @@ function renderizarTabela(cargas) {
             typeof carga.tempo_sla_segundos === "number"
         ) {
             iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
+>>>>>>> main
         }
     });
 }
@@ -293,6 +303,82 @@ function renderizarBotaoAcao(carga) {
     return "-";
 }
 
+<<<<<<< HEAD
+let expertCargaSelecionada = null;
+
+function expertGerenciarCarga(cargaId) {
+    if (!can("expert_manage")) return;
+
+    const carga = getCargaById(cargaId);
+    if (!carga) return;
+
+    expertCargaSelecionada = cargaId;
+
+    document.getElementById("expertAppointmentId").value = carga.appointment_id || "";
+    document.getElementById("expertStatus").value = carga.status || "arrival";
+    document.getElementById("expertUnits").value = Number(carga.units || 0);
+    document.getElementById("expertCartons").value = Number(carga.cartons || 0);
+    document.getElementById("expertAA").value = carga.aa_responsavel || "";
+    document.getElementById("expertTruckTipo").value = carga.truck_tipo || "";
+    document.getElementById("expertTruckType").value = carga.truck_type || "";
+
+    const modal = document.getElementById("modalExpertCarga");
+    if (modal) modal.style.display = "flex";
+}
+
+function fecharModalExpertCarga() {
+    expertCargaSelecionada = null;
+    const modal = document.getElementById("modalExpertCarga");
+    if (modal) modal.style.display = "none";
+}
+
+function salvarEdicaoExpert() {
+    if (!expertCargaSelecionada) return;
+
+    const updates = {
+        appointment_id: (document.getElementById("expertAppointmentId")?.value || "").trim(),
+        status: (document.getElementById("expertStatus")?.value || "").trim(),
+        units: Number(document.getElementById("expertUnits")?.value || 0),
+        cartons: Number(document.getElementById("expertCartons")?.value || 0),
+        aa_responsavel: (document.getElementById("expertAA")?.value || "").trim(),
+        truck_tipo: (document.getElementById("expertTruckTipo")?.value || "").trim(),
+        truck_type: (document.getElementById("expertTruckType")?.value || "").trim(),
+    };
+
+    fetch(`/pc/expert/manage/${expertCargaSelecionada}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "edit", updates })
+    })
+        .then(r => r.json())
+        .then(resp => {
+            if (resp?.error) return alert(resp.error);
+            fecharModalExpertCarga();
+            carregarCargas();
+        })
+        .catch(() => alert("Erro ao salvar edição expert."));
+}
+
+function deletarHardExpert() {
+    if (!expertCargaSelecionada) return;
+    if (!confirm("Confirma hard delete desta carga no banco?")) return;
+
+    fetch(`/pc/expert/manage/${expertCargaSelecionada}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "hard_delete" })
+    })
+        .then(r => r.json())
+        .then(resp => {
+            if (resp?.error) return alert(resp.error);
+            fecharModalExpertCarga();
+            carregarCargas();
+        })
+        .catch(() => alert("Erro ao deletar carga."));
+}
+
+
+=======
 function expertGerenciarCarga(cargaId) {
     if (!can("expert_manage")) return;
 
@@ -338,6 +424,7 @@ function expertGerenciarCarga(cargaId) {
     }
 }
 
+>>>>>>> main
 // ARRIVAL_SCHEDULED -> ARRIVAL
 function cargaChegou(cargaId) {
     fetch(`/pc/carga-chegou/${cargaId}`, { method: "POST" })
@@ -706,6 +793,48 @@ function calcularPrioridade(score) {
     return { label: "Baixa", classe: "prio-baixa" };
 }
 
+<<<<<<< HEAD
+
+// =====================================================
+// ➕ ADICIONAR CARGA (LC5+)
+// =====================================================
+function abrirModalAdicionarCarga() {
+    if (!can("painel_set_aa")) return;
+    const modal = document.getElementById("modalAdicionarCarga");
+    if (modal) modal.style.display = "flex";
+}
+
+function fecharModalAdicionarCarga() {
+    const modal = document.getElementById("modalAdicionarCarga");
+    if (modal) modal.style.display = "none";
+}
+
+function confirmarAdicionarCarga() {
+    const payload = {
+        appointment_id: (document.getElementById("addAppointmentId")?.value || "").trim(),
+        expected_arrival_date: (document.getElementById("addExpectedArrivalDate")?.value || "").trim(),
+        status: (document.getElementById("addStatus")?.value || "arrival_scheduled").trim(),
+        units: Number(document.getElementById("addUnits")?.value || 0),
+        cartons: Number(document.getElementById("addCartons")?.value || 0),
+        truck_tipo: (document.getElementById("addTruckTipo")?.value || "").trim(),
+        truck_type: (document.getElementById("addTruckType")?.value || "").trim(),
+    };
+
+    fetch("/pc/adicionar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+        .then(r => r.json())
+        .then(resp => {
+            if (resp?.error) return alert(resp.error);
+            fecharModalAdicionarCarga();
+            carregarCargas();
+        })
+        .catch(() => alert("Erro ao adicionar carga."));
+}
+=======
+>>>>>>> main
 
 // =====================================================
 // 📄 EOS (se existir no seu DOM)

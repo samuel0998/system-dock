@@ -133,6 +133,59 @@ def listar_cargas():
         return jsonify([]), 200
 
 
+@painel_bp.route("/adicionar", methods=["POST"])
+@require_capability("painel_set_aa")
+def adicionar_carga():
+    data = request.get_json(silent=True) or {}
+
+    appointment_id = (data.get("appointment_id") or "").strip()
+    expected_raw = (data.get("expected_arrival_date") or "").strip()
+    status = (data.get("status") or "arrival_scheduled").strip().lower()
+    truck_tipo = (data.get("truck_tipo") or "").strip() or None
+    truck_type = (data.get("truck_type") or "").strip() or None
+
+    try:
+        units = int(data.get("units") or 0)
+        cartons = int(data.get("cartons") or 0)
+    except Exception:
+        return jsonify({"error": "Units/Cartons inválidos"}), 400
+
+    if not appointment_id:
+        return jsonify({"error": "Appointment ID é obrigatório"}), 400
+
+    if status not in {"arrival_scheduled", "arrival", "checkin", "closed", "no_show", "deleted"}:
+        return jsonify({"error": "Status inválido"}), 400
+
+    try:
+        expected_dt = datetime.fromisoformat(expected_raw)
+    except Exception:
+        return jsonify({"error": "Expected Arrival Date inválida"}), 400
+
+    if expected_dt.tzinfo is None:
+        expected_dt = expected_dt.replace(tzinfo=timezone.utc)
+
+    existente = Carga.query.filter_by(appointment_id=appointment_id).first()
+    if existente:
+        return jsonify({"error": "Appointment ID já existe"}), 409
+
+    agora = datetime.now(timezone.utc)
+    carga = Carga(
+        appointment_id=appointment_id,
+        truck_tipo=truck_tipo,
+        truck_type=truck_type,
+        expected_arrival_date=expected_dt.astimezone(timezone.utc),
+        priority_last_update=agora,
+        status=status,
+        units=max(0, units),
+        cartons=max(0, cartons),
+    )
+
+    db.session.add(carga)
+    db.session.commit()
+
+    return jsonify({"message": "Carga adicionada com sucesso", "id": carga.id}), 201
+
+
 @painel_bp.route("/checkin/<int:carga_id>", methods=["POST"])
 @require_capability("painel_set_aa")
 def checkin(carga_id):
