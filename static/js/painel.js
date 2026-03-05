@@ -378,6 +378,11 @@ function deletarHardExpert() {
 }
 
 
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> Stashed changes
 =======
 function expertGerenciarCarga(cargaId) {
     if (!can("expert_manage")) return;
@@ -425,6 +430,10 @@ function expertGerenciarCarga(cargaId) {
 }
 
 >>>>>>> main
+<<<<<<< Updated upstream
+=======
+>>>>>>> origin/main
+>>>>>>> Stashed changes
 // ARRIVAL_SCHEDULED -> ARRIVAL
 function cargaChegou(cargaId) {
     fetch(`/pc/carga-chegou/${cargaId}`, { method: "POST" })
@@ -835,6 +844,7 @@ function confirmarAdicionarCarga() {
 }
 =======
 >>>>>>> main
+
 
 // =====================================================
 // 📄 EOS (se existir no seu DOM)
