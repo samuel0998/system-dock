@@ -16,10 +16,19 @@ function enviarPlanilha() {
     })
     .then(response => response.json())
     .then(data => {
+        const erros = Array.isArray(data.erros) ? data.erros : [];
+        const errosHtml = erros.length
+            ? `<details><summary>Erros (${erros.length})</summary><pre>${erros.join("\n")}</pre></details>`
+            : "";
+
         document.getElementById("resultado").innerHTML =
             `<p>${data.message}</p>
              <p>Cargas inseridas: ${data.inseridas}</p>
-             <p>Ignoradas: ${data.ignoradas}</p>`;
+             <p>Cargas atualizadas: ${data.atualizadas ?? 0}</p>
+             <p>Ignoradas: ${data.ignoradas}</p>
+             <p>Appointments repetidos no arquivo: ${data.repetidas_no_arquivo ?? 0}</p>
+             ${data.observacao ? `<p><strong>Obs.:</strong> ${data.observacao}</p>` : ""}
+             ${errosHtml}`;
     })
     .catch(error => {
         console.error(error);
