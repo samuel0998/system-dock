@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dock View - Login</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo_dock_white.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-body">
+    <div class="auth-card">
+        <div class="auth-logo-wrap">
+            <img src="{{ url_for('static', filename='img/logo_dock_white.png') }}" alt="Dock View" class="auth-logo">
+        </div>
+        <h1>Dock View GIG2</h1>
+        <p>Informe seu login para acessar o sistema.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="auth-messages">
+              {% for category, message in messages %}
+                <div class="auth-alert auth-alert-{{ category }}">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <form method="post" action="{{ url_for('auth.login_submit') }}" class="auth-form">
+            <label for="login">Login do Operador</label>
+            <input id="login" name="login" type="text" placeholder="Ex.: jdoe" autocomplete="username" required>
+            <button type="submit">Entrar</button>
+        </form>
+    </div>
+</body>
+</html>
