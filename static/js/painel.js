@@ -24,10 +24,13 @@ function can(cap) {
     return Boolean(window.AUTH_CAPS && window.AUTH_CAPS[cap]);
 }
 
+<<<<<<< HEAD
 function getCargaById(cargaId) {
     return cargasGlobais.find(c => String(c.id) === String(cargaId)) || null;
 }
 
+=======
+>>>>>>> main
 // =====================================================
 // 🔄 CARREGAR CARGAS
 // =====================================================
@@ -119,6 +122,17 @@ function renderizarTabela(cargas) {
             typeof carga.tempo_sla_segundos === "number"
         ) {
             iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
+<<<<<<< HEAD
+=======
+        }
+
+        // Timer SLA em tempo real para arrival / arrival_scheduled
+        if (
+            (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
+            typeof carga.tempo_sla_segundos === "number"
+        ) {
+            iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
+>>>>>>> main
         }
     });
 }
@@ -289,6 +303,7 @@ function renderizarBotaoAcao(carga) {
     return "-";
 }
 
+<<<<<<< HEAD
 let expertCargaSelecionada = null;
 
 function expertGerenciarCarga(cargaId) {
@@ -363,6 +378,53 @@ function deletarHardExpert() {
 }
 
 
+=======
+function expertGerenciarCarga(cargaId) {
+    if (!can("expert_manage")) return;
+
+    const acao = prompt("EXPERT: digite 'delete' para apagar do banco, ou 'edit' para editar campos.");
+    if (!acao) return;
+
+    if (acao.toLowerCase() === "delete") {
+        if (!confirm("Confirma hard delete desta carga no banco?")) return;
+        fetch(`/pc/expert/manage/${cargaId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "hard_delete" })
+        })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp?.error) return alert(resp.error);
+                carregarCargas();
+            });
+        return;
+    }
+
+    if (acao.toLowerCase() === "edit") {
+        const raw = prompt("Cole JSON de atualização. Ex: {\"status\":\"arrival\",\"units\":120}");
+        if (!raw) return;
+        let updates;
+        try {
+            updates = JSON.parse(raw);
+        } catch {
+            alert("JSON inválido.");
+            return;
+        }
+
+        fetch(`/pc/expert/manage/${cargaId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "edit", updates })
+        })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp?.error) return alert(resp.error);
+                carregarCargas();
+            });
+    }
+}
+
+>>>>>>> main
 // ARRIVAL_SCHEDULED -> ARRIVAL
 function cargaChegou(cargaId) {
     fetch(`/pc/carga-chegou/${cargaId}`, { method: "POST" })
@@ -589,7 +651,7 @@ function confirmarComentarioAtraso() {
 // =====================================================
 // 📅 FORMATAR DATA
 // =====================================================
-function formatarData(data) {
+  function formatarData(data) {
     if (!data) return "-";
     const d = new Date(data);
     if (isNaN(d)) return "-";
@@ -731,6 +793,7 @@ function calcularPrioridade(score) {
     return { label: "Baixa", classe: "prio-baixa" };
 }
 
+<<<<<<< HEAD
 
 // =====================================================
 // ➕ ADICIONAR CARGA (LC5+)
@@ -770,6 +833,8 @@ function confirmarAdicionarCarga() {
         })
         .catch(() => alert("Erro ao adicionar carga."));
 }
+=======
+>>>>>>> main
 
 // =====================================================
 // 📄 EOS (se existir no seu DOM)

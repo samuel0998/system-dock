@@ -776,6 +776,7 @@ body.dark-mode .tabela-cargas-atrasadas td {
 
 /* =========================================
    PAINEL - VISUAL MODERNO
+<<<<<<< HEAD
 ========================================= */
 .painel-header {
     margin-bottom: 18px;
@@ -787,6 +788,8 @@ body.dark-mode .tabela-cargas-atrasadas td {
     font-size: 14px;
 }
 
+=======
+>>>>>>> main
 .filtro-container-moderno {
     background: linear-gradient(160deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid #e2e8f0;
