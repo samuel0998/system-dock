@@ -31,6 +31,7 @@ function getCargaById(cargaId) {
 // =====================================================
 // 🔄 CARREGAR CARGAS
 // =====================================================
+
 function carregarCargas() {
     fetch("/pc/listar")
         .then(res => res.json())
@@ -247,9 +248,9 @@ function formatarSegundos(total) {
     return `${horas}:${minutos}:${segundos}`;
 }
 
-// =====================================================
+// 
 // 🔘 AÇÕES / BOTÕES
-// =====================================================
+// 
 function renderizarBotaoAcao(carga) {
     const expertBtn = can("expert_manage")
         ? `<button class="btn-comentario-atraso" onclick="expertGerenciarCarga('${carga.id}')">Expert</button>`
@@ -589,7 +590,7 @@ function confirmarComentarioAtraso() {
 // =====================================================
 // 📅 FORMATAR DATA
 // =====================================================
-function formatarData(data) {
+  function formatarData(data) {
     if (!data) return "-";
     const d = new Date(data);
     if (isNaN(d)) return "-";
@@ -770,6 +771,7 @@ function confirmarAdicionarCarga() {
         })
         .catch(() => alert("Erro ao adicionar carga."));
 }
+
 
 // =====================================================
 // 📄 EOS (se existir no seu DOM)

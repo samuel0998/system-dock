@@ -279,7 +279,7 @@ body.dark-mode .linha-atrasada td {
 .btn-danger:hover {
     background: #991b1b;
 }
-/* ================= MODAL ================= */
+/*  MODAL  */
 
 .modal-overlay {
     display: none;
@@ -351,9 +351,9 @@ body.dark-mode .linha-atrasada td {
     font-weight: bold;
 }
 
-/* =========================================
+/* 
    CARDS DASHBOARD PADRÃO PROFISSIONAL
-========================================= */
+ */
 
 .cards-container {
     display: grid;
@@ -477,9 +477,9 @@ body.dark-mode .linha-atrasada td {
 }
 
 
-/* =========================
+/* 
    🌙 DARK MODE
-========================= */
+ */
 
 body.dark-mode {
     background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
@@ -776,25 +776,6 @@ body.dark-mode .tabela-cargas-atrasadas td {
 
 /* =========================================
    PAINEL - VISUAL MODERNO
-========================================= */
-.painel-header {
-    margin-bottom: 18px;
-}
-
-.painel-subtitulo {
-    margin: 6px 0 0;
-    color: #64748b;
-    font-size: 14px;
-}
-
-.filtro-container-moderno {
-    background: linear-gradient(160deg, #ffffff 0%, #f8fafc 100%);
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 18px;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-}
-
 .filtro-header {
     width: 100%;
     margin-bottom: 6px;
