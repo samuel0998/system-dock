@@ -3,30 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <title>DOCA</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo_dock_white.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 </head>
 <body>
 
-<div class="top-bar">
-    <div class="logo-container">
-        <img src="{{ url_for('static', filename='img/logo_dock_white.png') }}" 
-             class="logo-img">
-        <h2>DOCK VIEW GIG2</h2>
+<header class="top-bar">
+    <div class="brand-area">
+        <div class="logo-wrap">
+            <img src="{{ url_for('static', filename='img/logo_dock_white.png') }}"
+                 class="logo-img"
+                 alt="Dock View GIG2">
+        </div>
+
+        <div class="brand-copy">
+            <h1 class="brand-title">DOCK VIEW GIG2</h1>
+            <p class="brand-subtitle">Controle operacional de cargas em tempo real</p>
+        </div>
     </div>
 
-    <div class="menu">
-        <a href="/upload">Upload</a>
-        <a href="/pc">Painel</a>
-        <a href="/dashboard">Dashboard</a>
-    </div>
-</div>
+    <nav class="menu" aria-label="Navegação principal">
+        {% if auth_caps.get('upload') %}
+        <a href="/upload" class="nav-link {% if request.path.startswith('/upload') %}active{% endif %}">Upload</a>
+        {% endif %}
+        <a href="/pc" class="nav-link {% if request.path.startswith('/pc') %}active{% endif %}">Painel</a>
+        {% if auth_caps.get('transferin_view') %}
+        <a href="/transferin" class="nav-link {% if request.path.startswith('/transferin') %}active{% endif %}">TransferIn</a>
+        {% endif %}
+        {% if auth_caps.get('dashboard_access') %}
+        <a href="/dashboard" class="nav-link {% if request.path.startswith('/dashboard') %}active{% endif %}">Dashboard</a>
+        {% endif %}
+        {% if session.get('auth_ok') %}
+        <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline;">
+            <button type="submit" class="nav-link nav-link-logout">Sair ({{ session.get('operator_login') }})</button>
+        </form>
+        {% endif %}
+    </nav>
+</header>
 
 
 <div class="container">
     {% block content %}{% endblock %}
 </div>
+
+<script>
+    window.AUTH_ROLE = {{ (auth_role or "")|tojson }};
+    window.AUTH_CAPS = {{ (auth_caps or {})|tojson }};
+</script>
 
 </body>
 </html>
