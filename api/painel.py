@@ -79,8 +79,8 @@ def listar_cargas():
             tempo_sla_segundos = None
 
             # ✅ Regra de SLA única:
-            # ARRIVAL e ARRIVAL_SCHEDULED ofendem em +4h do Expected Arrival Date.
-            if c.status in ("arrival", "arrival_scheduled"):
+            # ARRIVAL, ARRIVAL_SCHEDULED e CHECKIN ofendem em +4h do Expected Arrival Date.
+            if c.status in ("arrival", "arrival_scheduled", "checkin"):
                 deadline = _deadline_sla_por_expected(c)
 
                 if deadline:
@@ -190,19 +190,6 @@ def finalizar(carga_id):
     return jsonify({"message": "Carga finalizada"})
 
 
-@painel_bp.route("/limpar-banco", methods=["DELETE"])
-@require_capability("expert_manage")
-def limpar_banco():
-    deletadas = db.session.query(Carga).delete(synchronize_session=False)
-    db.session.commit()
-
-    return jsonify(
-        {
-            "message": "Banco limpo com sucesso",
-            "deletadas": int(deletadas or 0),
-        }
-    )
-
 
 @painel_bp.route("/deletar/<int:carga_id>", methods=["POST"])
 @require_capability("painel_delete")
@@ -261,8 +248,8 @@ def comentar_atraso(carga_id):
     if not carga:
         return jsonify({"error": "Carga não encontrada"}), 404
 
-    if carga.status not in ("arrival", "arrival_scheduled"):
-        return jsonify({"error": "Comentário só pode ser registrado para cargas em ARRIVAL/ARRIVAL_SCHEDULED"}), 400
+    if carga.status not in ("arrival", "arrival_scheduled", "checkin"):
+        return jsonify({"error": "Comentário só pode ser registrado para cargas em ARRIVAL/ARRIVAL_SCHEDULED/CHECKIN"}), 400
 
     carga.atraso_comentario = comentario
     carga.atraso_comentado_em = datetime.now(timezone.utc)

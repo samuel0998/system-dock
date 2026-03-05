@@ -72,7 +72,7 @@ function renderizarTabela(cargas) {
 
         // Linha vermelha quando SLA negativo (ARRIVAL ou ARRIVAL_SCHEDULED após expected)
         if (
-            (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
+            (carga.status === "arrival" || carga.status === "arrival_scheduled" || carga.status === "checkin") &&
             typeof carga.tempo_sla_segundos === "number" &&
             carga.tempo_sla_segundos < 0
         ) {
@@ -92,8 +92,11 @@ function renderizarTabela(cargas) {
                     ${Number(carga.priority_score ?? 0)} (${prioridade.label})
                 </span>
             </td>
-            <td id="timer-${carga.id}">
-                ${formatarTempoFinal(carga)}
+            <td id="timer-prod-${carga.id}">
+                ${formatarTempoProdutivo(carga)}
+            </td>
+            <td id="timer-sla-${carga.id}" class="tempo-sla ${isCargaAtrasada(carga) ? "tempo-sla-atrasado" : ""}">
+                ${formatarTempoSLAColuna(carga)}
             </td>
             <td>${renderizarBotaoAcao(carga)}</td>
             <td>${renderizarComentarioAtraso(carga)}</td>
@@ -103,7 +106,15 @@ function renderizarTabela(cargas) {
 
         // Cronômetro se estiver em checkin
         if (carga.status === "checkin" && carga.start_time) {
-            iniciarCronometro(carga.id, carga.start_time);
+            iniciarCronometroProdutivo(carga.id, carga.start_time);
+        }
+
+        // Timer SLA em tempo real para arrival / arrival_scheduled / checkin
+        if (
+            (carga.status === "arrival" || carga.status === "arrival_scheduled" || carga.status === "checkin") &&
+            typeof carga.tempo_sla_segundos === "number"
+        ) {
+            iniciarTimerSLA(carga.id, carga.tempo_sla_segundos, carga.status);
         }
 
         // Timer SLA em tempo real para arrival / arrival_scheduled
@@ -118,7 +129,7 @@ function renderizarTabela(cargas) {
 
 function isCargaAtrasada(carga) {
     return (
-        (carga.status === "arrival" || carga.status === "arrival_scheduled") &&
+        (carga.status === "arrival" || carga.status === "arrival_scheduled" || carga.status === "checkin") &&
         typeof carga.tempo_sla_segundos === "number" &&
         carga.tempo_sla_segundos < 0
     );
@@ -139,7 +150,7 @@ function renderizarComentarioAtraso(carga) {
 // =====================================================
 // ⏱ CRONÔMETRO (CHECKIN)
 // =====================================================
-function iniciarCronometro(id, startTimeISO) {
+function iniciarCronometroProdutivo(id, startTimeISO) {
     const start = new Date(startTimeISO);
 
     // Se data inválida, não inicia
@@ -149,22 +160,22 @@ function iniciarCronometro(id, startTimeISO) {
         const agora = new Date();
         // checkin é cronômetro crescente, nunca regressivo
         const diff = Math.max(0, Math.floor((agora - start) / 1000));
-        atualizarTempoTela(id, diff);
+        atualizarTempoProdutivoTela(id, diff);
     }, 1000);
 }
 
-function atualizarTempoTela(id, totalSegundos) {
+function atualizarTempoProdutivoTela(id, totalSegundos) {
     const t = Math.max(0, Number(totalSegundos || 0));
     const horas = String(Math.floor(t / 3600)).padStart(2, "0");
     const minutos = String(Math.floor((t % 3600) / 60)).padStart(2, "0");
     const segundos = String(t % 60).padStart(2, "0");
 
-    const el = document.getElementById(`timer-${id}`);
+    const el = document.getElementById(`timer-prod-${id}`);
     if (el) el.innerText = `${horas}:${minutos}:${segundos}`;
 }
 
 function iniciarTimerSLA(id, tempoInicialSegundos, status) {
-    const el = document.getElementById(`timer-${id}`);
+    const el = document.getElementById(`timer-sla-${id}`);
     if (!el) return;
 
     const rowEl = document.getElementById(`row-carga-${id}`);
@@ -172,39 +183,47 @@ function iniciarTimerSLA(id, tempoInicialSegundos, status) {
     let restante = Number(tempoInicialSegundos);
     el.innerText = formatarTempoSLA(restante);
 
-    if (rowEl && (status === "arrival" || status === "arrival_scheduled")) {
+    if (rowEl && (status === "arrival" || status === "arrival_scheduled" || status === "checkin")) {
         rowEl.classList.toggle("linha-atrasada", restante < 0);
     }
+    el.classList.toggle("tempo-sla-atrasado", restante < 0);
 
     timers[`sla-${id}`] = setInterval(() => {
         restante -= 1;
         el.innerText = formatarTempoSLA(restante);
 
-        if (rowEl && (status === "arrival" || status === "arrival_scheduled")) {
+        if (rowEl && (status === "arrival" || status === "arrival_scheduled" || status === "checkin")) {
             rowEl.classList.toggle("linha-atrasada", restante < 0);
         }
+        el.classList.toggle("tempo-sla-atrasado", restante < 0);
     }, 1000);
 }
 
 // =====================================================
 // 🎯 TEMPO (ARRIVAL SLA / CHECKIN / CLOSED)
 // =====================================================
-function formatarTempoFinal(carga) {
-
-    // CLOSED -> tempo total
+function formatarTempoProdutivo(carga) {
+    // CLOSED -> tempo total produtivo consolidado
     if (carga.status === "closed" && typeof carga.tempo_total_segundos === "number") {
         return formatarSegundos(carga.tempo_total_segundos);
     }
 
-    // CHECKIN -> começa 00:00:00 e cronômetro roda
+    // CHECKIN -> cronômetro produtivo crescente
     if (carga.status === "checkin") {
         return "00:00:00";
     }
 
-    // ARRIVAL / ARRIVAL_SCHEDULED -> SLA vindo do backend (tempo_sla_segundos)
-    // Em ARRIVAL_SCHEDULED o backend só preenche após passar do expected.
-    if (carga.status === "arrival" || carga.status === "arrival_scheduled") {
+    return "-";
+}
+
+function formatarTempoSLAColuna(carga) {
+    // SLA deve continuar visível inclusive em CHECKIN
+    if (carga.status === "arrival" || carga.status === "arrival_scheduled" || carga.status === "checkin") {
         return formatarTempoSLA(carga.tempo_sla_segundos);
+    }
+
+    if (carga.atraso_registrado && Number(carga.atraso_segundos || 0) > 0) {
+        return `-${formatarSegundos(Number(carga.atraso_segundos || 0))}`;
     }
 
     return "-";
@@ -687,27 +706,6 @@ function calcularPrioridade(score) {
     return { label: "Baixa", classe: "prio-baixa" };
 }
 
-// =====================================================
-// 🗑 LIMPAR BANCO
-// =====================================================
-function limparBanco() {
-    const confirmacao = confirm(
-        "⚠ ATENÇÃO!\n\nIsso irá apagar TODAS as cargas do banco.\n\nDeseja continuar?"
-    );
-
-    if (!confirmacao) return;
-
-    fetch("/pc/limpar-banco", { method: "DELETE" })
-        .then(res => res.json())
-        .then(data => {
-            alert(`${data.deletadas} cargas removidas.`);
-            carregarCargas();
-        })
-        .catch(err => {
-            console.error("Erro ao limpar banco:", err);
-            alert("Erro ao limpar banco.");
-        });
-}
 
 // =====================================================
 // 📄 EOS (se existir no seu DOM)
