@@ -144,11 +144,9 @@ function renderizarComentarioAtraso(carga) {
     return `${balao}<button class="btn-comentario-atraso" onclick="abrirModalAtraso('${carga.id}')">${textoBotao}</button>`;
 }
 
-// 
-
-
+// =====================================================
 // ⏱ CRONÔMETRO (CHECKIN)
-// 
+// =====================================================
 function iniciarCronometroProdutivo(id, startTimeISO) {
     const start = new Date(startTimeISO);
 
@@ -198,9 +196,9 @@ function iniciarTimerSLA(id, tempoInicialSegundos, status) {
     }, 1000);
 }
 
-// 
+// =====================================================
 // 🎯 TEMPO (ARRIVAL SLA / CHECKIN / CLOSED)
-// 
+// =====================================================
 function formatarTempoProdutivo(carga) {
     // CLOSED -> tempo total produtivo consolidado
     if (carga.status === "closed" && typeof carga.tempo_total_segundos === "number") {
@@ -363,53 +361,6 @@ function deletarHardExpert() {
             carregarCargas();
         })
         .catch(() => alert("Erro ao deletar carga."));
-}
-
-
-
-function expertGerenciarCarga(cargaId) {
-    if (!can("expert_manage")) return;
-
-    const acao = prompt("EXPERT: digite 'delete' para apagar do banco, ou 'edit' para editar campos.");
-    if (!acao) return;
-
-    if (acao.toLowerCase() === "delete") {
-        if (!confirm("Confirma hard delete desta carga no banco?")) return;
-        fetch(`/pc/expert/manage/${cargaId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "hard_delete" })
-        })
-            .then(r => r.json())
-            .then(resp => {
-                if (resp?.error) return alert(resp.error);
-                carregarCargas();
-            });
-        return;
-    }
-
-    if (acao.toLowerCase() === "edit") {
-        const raw = prompt("Cole JSON de atualização. Ex: {\"status\":\"arrival\",\"units\":120}");
-        if (!raw) return;
-        let updates;
-        try {
-            updates = JSON.parse(raw);
-        } catch {
-            alert("JSON inválido.");
-            return;
-        }
-
-        fetch(`/pc/expert/manage/${cargaId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "edit", updates })
-        })
-            .then(r => r.json())
-            .then(resp => {
-                if (resp?.error) return alert(resp.error);
-                carregarCargas();
-            });
-    }
 }
 
 

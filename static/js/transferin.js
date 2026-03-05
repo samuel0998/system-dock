@@ -225,6 +225,43 @@ function finalizarTransfer(id) {
         });
 }
 
+
+function abrirModalAdicionarTransfer() {
+    if (!can("transferin_edit")) return;
+    const modal = document.getElementById("modalAdicionarTransfer");
+    if (modal) modal.style.display = "flex";
+}
+
+function fecharModalAdicionarTransfer() {
+    const modal = document.getElementById("modalAdicionarTransfer");
+    if (modal) modal.style.display = "none";
+}
+
+function salvarNovaTransfer() {
+    const payload = {
+        appointment_id: (document.getElementById("addTransferAppointment")?.value || "").trim(),
+        expected_arrival_date: (document.getElementById("addTransferExpectedArrival")?.value || "").trim(),
+        vrid: (document.getElementById("addTransferVrid")?.value || "").trim(),
+        origem: (document.getElementById("addTransferOrigem")?.value || "").trim(),
+        late_stow_deadline: (document.getElementById("addTransferLateStow")?.value || "").trim(),
+        units: Number(document.getElementById("addTransferUnits")?.value || 0),
+        cartons: Number(document.getElementById("addTransferCartons")?.value || 0),
+    };
+
+    fetch('/transferin/adicionar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+        .then(r => r.json())
+        .then(resp => {
+            if (resp?.error) return alert(resp.error);
+            fecharModalAdicionarTransfer();
+            carregarTransferencias();
+        })
+        .catch(() => alert('Erro ao adicionar transferência.'));
+}
+
 function limparFiltrosTransfer() {
     const a = document.getElementById("filtroTransferAppointment");
     const o = document.getElementById("filtroTransferOrigem");

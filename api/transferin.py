@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, render_template, request
@@ -22,7 +22,7 @@ def _to_aware_utc(dt):
     if not dt:
         return None
     if getattr(dt, "tzinfo", None) is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=LOCAL_TZ).astimezone(timezone.utc)
     return dt.astimezone(timezone.utc)
 
 
@@ -272,3 +272,86 @@ def comentar_transferencia(transfer_id):
     t.comentario_late_stow_em = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify({"message": "Comentário salvo"}), 200
+
+
+@transferin_bp.route("/adicionar", methods=["POST"])
+@require_capability("transferin_edit")
+def adicionar_transferencia():
+    data = request.get_json(silent=True) or {}
+
+    appointment_id = (data.get("appointment_id") or "").strip()
+    expected_raw = (data.get("expected_arrival_date") or "").strip()
+    vrid = (data.get("vrid") or "").strip()
+    origem = (data.get("origem") or "").strip().upper()
+    late_stow_raw = (data.get("late_stow_deadline") or "").strip()
+
+    try:
+        units = int(data.get("units") or 0)
+        cartons = int(data.get("cartons") or 0)
+    except Exception:
+        return jsonify({"error": "Units/Cartons inválidos"}), 400
+
+    if not appointment_id:
+        return jsonify({"error": "Appointment ID é obrigatório"}), 400
+    if not expected_raw:
+        return jsonify({"error": "Expected Arrival é obrigatório"}), 400
+    if not vrid:
+        return jsonify({"error": "VRID é obrigatório"}), 400
+    if origem not in ORIGENS_VALIDAS:
+        return jsonify({"error": "Origem inválida"}), 400
+
+    try:
+        expected_dt = datetime.fromisoformat(expected_raw)
+    except Exception:
+        return jsonify({"error": "Expected Arrival inválido"}), 400
+
+    if expected_dt.tzinfo is None:
+        expected_dt = expected_dt.replace(tzinfo=LOCAL_TZ)
+    expected_utc = expected_dt.astimezone(timezone.utc)
+
+    if late_stow_raw:
+        try:
+            late_dt = datetime.fromisoformat(late_stow_raw)
+            if late_dt.tzinfo is None:
+                late_dt = late_dt.replace(tzinfo=LOCAL_TZ)
+            late_utc = late_dt.astimezone(timezone.utc)
+        except Exception:
+            return jsonify({"error": "LATE STOW inválido"}), 400
+    else:
+        late_utc = expected_utc + timedelta(hours=4)
+
+    if Carga.query.filter_by(appointment_id=appointment_id).first() or Transferencia.query.filter_by(appointment_id=appointment_id).first():
+        return jsonify({"error": "Appointment ID já existe"}), 409
+
+    agora = datetime.now(timezone.utc)
+    carga = Carga(
+        appointment_id=appointment_id,
+        truck_type="TRANSSHIP",
+        truck_tipo="Transferência",
+        expected_arrival_date=expected_utc,
+        priority_last_update=agora,
+        status="arrival_scheduled",
+        units=max(0, units),
+        cartons=max(0, cartons),
+    )
+    db.session.add(carga)
+    db.session.flush()
+
+    t = Transferencia(
+        appointment_id=appointment_id,
+        carga_id=carga.id,
+        expected_arrival_date=expected_utc,
+        status_carga=carga.status,
+        units=max(0, units),
+        cartons=max(0, cartons),
+        vrid=vrid,
+        origem=origem,
+        late_stow_deadline=late_utc,
+        info_preenchida=True,
+        created_at=agora,
+    )
+    _atualizar_estado_prazo(t, agora)
+    db.session.add(t)
+    db.session.commit()
+
+    return jsonify({"message": "Transferência adicionada com sucesso", "id": t.id}), 201

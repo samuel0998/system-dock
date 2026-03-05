@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from sqlalchemy import func
 
 from db import db
@@ -7,6 +8,11 @@ from models import Carga, Transferencia
 from api.auth import require_capability, has_capability
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
+
+try:
+    LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
+except Exception:
+    LOCAL_TZ = timezone(timedelta(hours=-3))
 
 
 @dashboard_bp.route("/")
@@ -56,7 +62,7 @@ def dashboard_stats():
         if not dt:
             return None
         if getattr(dt, "tzinfo", None) is None:
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=LOCAL_TZ).astimezone(timezone.utc)
         return dt.astimezone(timezone.utc)
 
     def _deadline_sla(c):
@@ -284,6 +290,10 @@ def dashboard_stats():
             atraso = int((agora - deadline).total_seconds())
         else:
             atraso = int(c.atraso_segundos or 0)
+
+        # Regra solicitada: mostrar na lista apenas quando atraso efetivo >= 4h.
+        if atraso < 4 * 3600:
+            continue
 
         expected_utc = _to_aware_utc(c.expected_arrival_date)
         cargas_atrasadas.append({
