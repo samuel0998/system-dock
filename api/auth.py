@@ -82,17 +82,52 @@ def _normalize_role(raw_permission) -> str | None:
     return None
 
 
+def _normalize_bool(raw_value):
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, bool):
+        return raw_value
+
+    s = str(raw_value).strip().upper()
+    if s in {"TRUE", "1", "YES", "Y", "SIM", "S"}:
+        return True
+    if s in {"FALSE", "0", "NO", "N", "NAO", "NÃO", ""}:
+        return False
+    return None
+
+
+def _first_present(row, keys):
+    for k in keys:
+        if k in row:
+            return row.get(k)
+    return None
+
+
 
 
 def _resolve_role_from_row(row) -> str | None:
+    # Se existir flag booleana explícita de dockview e ela for falsa, bloqueia login.
+    dockview_raw = _first_present(row, ["permission_dockview", "permissao_dockview", "dockview"])
+    dockview_bool = _normalize_bool(dockview_raw)
+    if dockview_bool is False:
+        return None
+
     # Prioridade: nível explícito > flag booleana legada.
-    role_raw = (
-        row.get("permission_level_dockview")
-        or row.get("permission_nivel_dockview")
-        or row.get("nivel_permissao_dockview")
-        or row.get("permission_level")
-        or row.get("permission_dockview")
+    role_raw = _first_present(
+        row,
+        [
+            "permission_level_dockview",
+            "permission_nivel_dockview",
+            "nivel_permissao_dockview",
+            "permission_level",
+            "permission_dockview",
+        ],
     )
+
+    # Sem nível explícito, usa o flag booleano quando disponível.
+    if role_raw is None and dockview_bool is not None:
+        return "LC5" if dockview_bool else None
+
     return _normalize_role(role_raw)
 
 
