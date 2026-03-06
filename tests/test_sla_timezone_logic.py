@@ -2,13 +2,15 @@ import unittest
 from datetime import datetime
 
 from api.dashboard import _status_pode_ficar_em_atraso
-from api.painel import _deadline_sla_por_expected, _to_aware_utc
+from api.painel import _deadline_sla_por_expected, _to_aware_utc, _atraso_fechamento_segundos
 
 
 class _CargaFake:
-    def __init__(self, expected_arrival_date):
+    def __init__(self, expected_arrival_date, status="arrival_scheduled", end_time=None):
         self.expected_arrival_date = expected_arrival_date
         self.arrived_at = None
+        self.status = status
+        self.end_time = end_time
 
 
 class SlaTimezoneLogicTests(unittest.TestCase):
@@ -32,6 +34,15 @@ class SlaTimezoneLogicTests(unittest.TestCase):
         self.assertTrue(_status_pode_ficar_em_atraso("arrival"))
         self.assertTrue(_status_pode_ficar_em_atraso("checkin"))
         self.assertTrue(_status_pode_ficar_em_atraso("closed"))
+
+    def test_closed_atraso_is_recalculated_from_end_time(self):
+        # expected 19:00 UTC -> deadline 23:00 UTC; end 23:10 UTC => 600s de atraso real.
+        carga = _CargaFake(
+            datetime(2026, 3, 6, 19, 0, 0),
+            status="closed",
+            end_time=datetime(2026, 3, 6, 23, 10, 0),
+        )
+        self.assertEqual(_atraso_fechamento_segundos(carga), 600)
 
 
 if __name__ == "__main__":

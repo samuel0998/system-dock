@@ -48,6 +48,19 @@ def _deadline_sla_por_expected(carga: Carga) -> datetime | None:
     return None
 
 
+def _atraso_fechamento_segundos(carga: Carga) -> int:
+    """Calcula atraso real no fechamento com base no end_time x deadline de expected."""
+    if carga.status != "closed":
+        return 0
+
+    deadline = _deadline_sla_por_expected(carga)
+    end_time = _to_aware_utc(carga.end_time)
+    if not deadline or not end_time:
+        return 0
+
+    return max(0, int((end_time - deadline).total_seconds()))
+
+
 # =====================================================
 # Pages
 # =====================================================
@@ -101,6 +114,17 @@ def listar_cargas():
                             c.atraso_segundos = atraso_atual
                             c.atraso_registrado = True
                             mudou_algo = True
+
+            if c.status == "closed":
+                atraso_real = _atraso_fechamento_segundos(c)
+                atraso_atual = int(c.atraso_segundos or 0)
+                flag_atual = bool(c.atraso_registrado)
+                flag_nova = atraso_real > 0
+
+                if atraso_atual != atraso_real or flag_atual != flag_nova:
+                    c.atraso_segundos = atraso_real
+                    c.atraso_registrado = flag_nova
+                    mudou_algo = True
 
             start_time_utc = _to_aware_utc(c.start_time)
 

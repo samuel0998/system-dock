@@ -285,8 +285,16 @@ def dashboard_stats():
         .all()
     )
 
+    def _atraso_fechamento_segundos(c):
+        deadline = _deadline_sla(c)
+        end_time = _to_aware_utc(c.end_time)
+        if not deadline or not end_time:
+            return 0
+        return max(0, int((end_time - deadline).total_seconds()))
+
     cargas_atrasadas = []
     mudou_status = False
+    mudou_atraso = False
     for c in cargas_sla:
         # Apenas ARRIVAL_SCHEDULED pode virar NO_SHOW (24h após expected).
         if c.status == "arrival_scheduled":
@@ -304,6 +312,18 @@ def dashboard_stats():
 
         ofendeu_agora = agora > deadline
         ofendeu_historico = bool(c.atraso_registrado)
+
+        if c.status == "closed":
+            atraso_fechamento = _atraso_fechamento_segundos(c)
+            atraso_atual = int(c.atraso_segundos or 0)
+            flag_nova = atraso_fechamento > 0
+            if atraso_atual != atraso_fechamento or bool(c.atraso_registrado) != flag_nova:
+                c.atraso_segundos = atraso_fechamento
+                c.atraso_registrado = flag_nova
+                mudou_atraso = True
+
+            ofendeu_agora = False
+            ofendeu_historico = flag_nova
 
         if not ofendeu_agora and not ofendeu_historico:
             continue
@@ -329,7 +349,7 @@ def dashboard_stats():
             "atraso_comentario": c.atraso_comentario,
         })
 
-    if mudou_status:
+    if mudou_status or mudou_atraso:
         db.session.commit()
 
     transferencias_rows = (
