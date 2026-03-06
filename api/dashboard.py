@@ -18,9 +18,10 @@ except Exception:
 def _status_pode_ficar_em_atraso(status: str | None) -> bool:
     status_norm = (status or "").strip().lower()
     # Regra de negócio:
-    # - closed = finalizada -> não entra na lista de atrasos
     # - no_show sai da lista de atrasos e entra na métrica própria
-    return status_norm not in {"closed", "no_show"}
+    # - closed pode permanecer na lista somente quando atraso já foi registrado
+    #   (esse controle é feito pelo campo atraso_registrado no loop principal)
+    return status_norm != "no_show"
 
 
 @dashboard_bp.route("/")
