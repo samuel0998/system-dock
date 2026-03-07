@@ -238,6 +238,31 @@ def dashboard_stats():
     )
     notas_deletadas_por_dia = {str(r.dia): int(r.qtd) for r in deletadas_por_dia_rows}
 
+    cargas_deletadas_rows = (
+        Carga.query
+        .filter(
+            Carga.status == "deleted",
+            Carga.deleted_at.isnot(None),
+            Carga.deleted_at >= inicio,
+            Carga.deleted_at <= fim,
+        )
+        .order_by(Carga.deleted_at.desc())
+        .all()
+    )
+
+    cargas_deletadas = []
+    for c in cargas_deletadas_rows:
+        cargas_deletadas.append({
+            "appointment_id": c.appointment_id,
+            "status": c.status,
+            "expected_arrival_date": _to_aware_utc(c.expected_arrival_date).isoformat() if c.expected_arrival_date else None,
+            "deleted_at": _to_aware_utc(c.deleted_at).isoformat() if c.deleted_at else None,
+            "units": int(c.units or 0),
+            "cartons": int(c.cartons or 0),
+            "aa_responsavel": c.aa_responsavel,
+            "delete_reason": c.delete_reason,
+        })
+
     # ==========================
     # NO SHOW por created_at (mantendo sua lógica atual)
     # ==========================
@@ -413,11 +438,13 @@ def dashboard_stats():
         "cargas_atrasadas": cargas_atrasadas[:50],
         "total_transferencias_late_stow": len(transferencias_late),
         "transferencias_late_stow": transferencias_late[:100],
+        "cargas_deletadas": cargas_deletadas[:100],
     }
 
     if not has_capability("dashboard_tables"):
         payload["cargas_atrasadas"] = []
         payload["transferencias_late_stow"] = []
+        payload["cargas_deletadas"] = []
         payload["por_login"] = {}
         payload["produtividade_por_aa"] = {}
 

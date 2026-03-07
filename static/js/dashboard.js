@@ -49,6 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("filtroAtrasoAppointment")?.addEventListener("input", aplicarFiltrosTabelas);
     document.getElementById("filtroProdLogin")?.addEventListener("input", aplicarFiltrosTabelas);
     document.getElementById("filtroTransferLateAppointment")?.addEventListener("input", aplicarFiltrosTabelas);
+    document.getElementById("filtroDeletedAppointment")?.addEventListener("input", aplicarFiltrosTabelas);
 
     aplicarFiltro();
 });
@@ -122,6 +123,7 @@ function aplicarFiltrosTabelas() {
     const filtroAppointment = (document.getElementById("filtroAtrasoAppointment")?.value || "").toLowerCase();
     const filtroLogin = (document.getElementById("filtroProdLogin")?.value || "").toLowerCase();
     const filtroTransferAppointment = (document.getElementById("filtroTransferLateAppointment")?.value || "").toLowerCase();
+    const filtroDeletedAppointment = (document.getElementById("filtroDeletedAppointment")?.value || "").toLowerCase();
 
     const atrasadas = (dadosDashboard.cargas_atrasadas || []).filter(c =>
         String(c.appointment_id || "").toLowerCase().includes(filtroAppointment)
@@ -135,9 +137,45 @@ function aplicarFiltrosTabelas() {
         String(t.appointment_id || "").toLowerCase().includes(filtroTransferAppointment)
     );
 
+    const deletadas = (dadosDashboard.cargas_deletadas || []).filter(c =>
+        String(c.appointment_id || "").toLowerCase().includes(filtroDeletedAppointment)
+    );
+
     renderizarListaAtrasadas(atrasadas);
     renderizarTabelaProdutividade(produtividade);
     renderizarTabelaTransferLate(transferLate);
+    renderizarTabelaDeletadas(deletadas);
+}
+
+function renderizarTabelaDeletadas(rows) {
+    const tbody = document.getElementById("tabelaCargasDeletadas");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="linha-sem-dados">Nenhuma carga deletada no período selecionado.</td></tr>`;
+        return;
+    }
+
+    rows.forEach(c => {
+        const comentario = c.delete_reason
+            ? `<button class="btn-balao" title="${escapeHtml(c.delete_reason)}" onclick="alert('${escapeJs(c.delete_reason)}')">💬</button>`
+            : "-";
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${c.appointment_id ?? "-"}</td>
+            <td>${formatarStatus(c.status)}</td>
+            <td>${formatarDataHora(c.expected_arrival_date)}</td>
+            <td>${formatarDataHora(c.deleted_at)}</td>
+            <td>${Number(c.units ?? 0)}</td>
+            <td>${Number(c.cartons ?? 0)}</td>
+            <td>${c.aa_responsavel ?? "-"}</td>
+            <td>${comentario}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 function renderizarTabelaTransferLate(rows) {
