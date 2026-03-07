@@ -28,8 +28,17 @@ def _get_database_uri() -> str:
 
 
 def init_db(app):
-    app.config["SQLALCHEMY_DATABASE_URI"] = _get_database_uri()
+    uri = _get_database_uri()
+    app.config["SQLALCHEMY_DATABASE_URI"] = uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    # Garante sessão em UTC no PostgreSQL (evita divergência entre app e banco).
+    if uri.startswith("postgresql://"):
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "connect_args": {
+                "options": "-c timezone=UTC"
+            }
+        }
 
     db.init_app(app)
     migrate.init_app(app, db)

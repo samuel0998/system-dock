@@ -15,6 +15,15 @@ except Exception:
     LOCAL_TZ = timezone(timedelta(hours=-3))
 
 
+def _status_pode_ficar_em_atraso(status: str | None) -> bool:
+    status_norm = (status or "").strip().lower()
+    # Regra de negócio:
+    # - no_show sai da lista de atrasos e entra na métrica própria
+    # - closed pode permanecer na lista somente quando atraso já foi registrado
+    #   (esse controle é feito pelo campo atraso_registrado no loop principal)
+    return status_norm != "no_show"
+
+
 @dashboard_bp.route("/")
 @require_capability("dashboard_access")
 def dashboard_page():
@@ -62,7 +71,9 @@ def dashboard_stats():
         if not dt:
             return None
         if getattr(dt, "tzinfo", None) is None:
-            return dt.replace(tzinfo=LOCAL_TZ).astimezone(timezone.utc)
+            # No banco, timestamps podem voltar como naive mesmo estando em UTC.
+            # Tratar naive como UTC evita adicionar +3h indevidos no SLA.
+            return dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc)
 
     def _deadline_sla(c):
@@ -266,22 +277,57 @@ def dashboard_stats():
         .scalar()
     ) or 0
 
-    # Métrica histórica: carga que ofendeu permanece registrada para sempre.
+    # Lista de atrasos respeita o filtro de data do dashboard.
     cargas_sla = (
         Carga.query
-        .filter(Carga.expected_arrival_date.isnot(None))
+        .filter(
+            Carga.expected_arrival_date.isnot(None),
+            Carga.expected_arrival_date >= inicio,
+            Carga.expected_arrival_date <= fim,
+        )
         .order_by(Carga.expected_arrival_date.asc())
         .all()
     )
 
+    def _atraso_fechamento_segundos(c):
+        deadline = _deadline_sla(c)
+        end_time = _to_aware_utc(c.end_time)
+        if not deadline or not end_time:
+            return 0
+        return max(0, int((end_time - deadline).total_seconds()))
+
     cargas_atrasadas = []
+    mudou_status = False
+    mudou_atraso = False
     for c in cargas_sla:
+        # Apenas ARRIVAL_SCHEDULED pode virar NO_SHOW (24h após expected).
+        if c.status == "arrival_scheduled":
+            expected = _to_aware_utc(c.expected_arrival_date)
+            if expected and agora > (expected + timedelta(hours=24)):
+                c.status = "no_show"
+                mudou_status = True
+
+        if not _status_pode_ficar_em_atraso(c.status):
+            continue
+
         deadline = _deadline_sla(c)
         if not deadline:
             continue
 
         ofendeu_agora = agora > deadline
         ofendeu_historico = bool(c.atraso_registrado)
+
+        if c.status == "closed":
+            atraso_fechamento = _atraso_fechamento_segundos(c)
+            atraso_atual = int(c.atraso_segundos or 0)
+            flag_nova = atraso_fechamento > 0
+            if atraso_atual != atraso_fechamento or bool(c.atraso_registrado) != flag_nova:
+                c.atraso_segundos = atraso_fechamento
+                c.atraso_registrado = flag_nova
+                mudou_atraso = True
+
+            ofendeu_agora = False
+            ofendeu_historico = flag_nova
 
         if not ofendeu_agora and not ofendeu_historico:
             continue
@@ -291,8 +337,8 @@ def dashboard_stats():
         else:
             atraso = int(c.atraso_segundos or 0)
 
-        # Regra solicitada: mostrar na lista apenas quando atraso efetivo >= 4h.
-        if atraso < 4 * 3600:
+        # Regra: entrou em atraso assim que SLA estoura (qualquer valor > 0).
+        if atraso <= 0:
             continue
 
         expected_utc = _to_aware_utc(c.expected_arrival_date)
@@ -306,6 +352,9 @@ def dashboard_stats():
             "aa_responsavel": c.aa_responsavel,
             "atraso_comentario": c.atraso_comentario,
         })
+
+    if mudou_status or mudou_atraso:
+        db.session.commit()
 
     transferencias_rows = (
         Transferencia.query
