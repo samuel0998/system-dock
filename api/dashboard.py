@@ -277,10 +277,14 @@ def dashboard_stats():
         .scalar()
     ) or 0
 
-    # Métrica histórica: carga que ofendeu permanece registrada para sempre.
+    # Lista de atrasos respeita o filtro de data do dashboard.
     cargas_sla = (
         Carga.query
-        .filter(Carga.expected_arrival_date.isnot(None))
+        .filter(
+            Carga.expected_arrival_date.isnot(None),
+            Carga.expected_arrival_date >= inicio,
+            Carga.expected_arrival_date <= fim,
+        )
         .order_by(Carga.expected_arrival_date.asc())
         .all()
     )
