@@ -130,6 +130,33 @@
         </div>
     </div>
 
+
+
+    <div class="dashboard-lista-atraso">
+        <div class="dashboard-lista-header">
+            <h4>Lista de Cargas Deletadas</h4>
+            <small>Cargas deletadas no período com motivo/comentário</small>
+            <input type="text" id="filtroDeletedAppointment" placeholder="Filtrar Appointment ID" class="input-filtro-dashboard">
+        </div>
+        <div class="dashboard-lista-wrap">
+            <table class="tabela-cargas-atrasadas">
+                <thead>
+                    <tr>
+                        <th>Appointment ID</th>
+                        <th>Status</th>
+                        <th>Expected Arrival</th>
+                        <th>Deletada em</th>
+                        <th>Units</th>
+                        <th>Cartons</th>
+                        <th>AA</th>
+                        <th>Comentário</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaCargasDeletadas"></tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="dashboard-lista-atraso">
         <div class="dashboard-lista-header">
             <h4>Transferências com Late Stow</h4>
